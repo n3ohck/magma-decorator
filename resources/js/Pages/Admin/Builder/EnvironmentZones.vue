@@ -1,0 +1,457 @@
+<template>
+    <BuilderLayout title="Zonas de ambientes">
+        <div class="mb-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div>
+                <p class="text-white/50">
+                    Define las áreas editables de cada ambiente: piso, muro, barra, isla, backsplash o fachada.
+                </p>
+            </div>
+
+            <button
+                class="rounded-2xl bg-violet-500 px-5 py-3 font-semibold text-white hover:bg-violet-600"
+                @click="openCreate"
+            >
+                + Nueva zona
+            </button>
+        </div>
+
+        <div class="grid gap-5 xl:grid-cols-[1fr_420px]">
+            <div class="rounded-3xl border border-white/10 bg-white/[0.06] overflow-hidden">
+                <table class="w-full text-left">
+                    <thead class="bg-white/[0.04] text-xs uppercase tracking-wider text-white/40">
+                    <tr>
+                        <th class="p-4">Máscara</th>
+                        <th class="p-4">Zona</th>
+                        <th class="p-4">Ambiente</th>
+                        <th class="p-4">Tipo</th>
+                        <th class="p-4">Activa</th>
+                        <th class="p-4 text-right">Acciones</th>
+                    </tr>
+                    </thead>
+
+                    <tbody class="divide-y divide-white/10">
+                    <tr
+                        v-for="item in items"
+                        :key="item.id"
+                        class="hover:bg-white/[0.03]"
+                        @mouseenter="previewItem = item"
+                    >
+                        <td class="p-4">
+                            <img
+                                v-if="item.mask_image_url"
+                                :src="item.mask_image_url"
+                                class="h-14 w-20 rounded-xl bg-white/10 object-cover"
+                            />
+                            <div v-else class="grid h-14 w-20 place-items-center rounded-xl bg-white/10 text-white/30">
+                                -
+                            </div>
+                        </td>
+
+                        <td class="p-4">
+                            <p class="font-semibold">{{ item.name }}</p>
+                            <p class="text-xs text-white/40">{{ item.slug }}</p>
+                        </td>
+
+                        <td class="p-4 text-white/60">
+                            {{ item.environment?.name || 'Sin ambiente' }}
+                        </td>
+
+                        <td class="p-4 text-white/60">
+                            {{ zoneTypeLabel(item.zone_type) }}
+                        </td>
+
+                        <td class="p-4">
+                                <span
+                                    class="rounded-full px-3 py-1 text-xs"
+                                    :class="item.is_active ? 'bg-emerald-500/20 text-emerald-200' : 'bg-red-500/20 text-red-200'"
+                                >
+                                    {{ item.is_active ? 'Sí' : 'No' }}
+                                </span>
+                        </td>
+
+                        <td class="p-4 text-right">
+                            <button class="mr-4 text-violet-300 hover:text-violet-100" @click="openEdit(item)">
+                                Editar
+                            </button>
+
+                            <button class="text-red-300 hover:text-red-100" @click="destroy(item)">
+                                Eliminar
+                            </button>
+                        </td>
+                    </tr>
+
+                    <tr v-if="!items.length">
+                        <td colspan="6" class="p-8 text-center text-white/50">
+                            No hay zonas registradas.
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <aside class="rounded-3xl border border-white/10 bg-white/[0.06] p-5">
+                <p class="text-xs uppercase tracking-[0.25em] text-violet-300">
+                    Preview
+                </p>
+
+                <h3 class="mt-1 text-lg font-bold">
+                    {{ previewItem?.name || 'Selecciona una zona' }}
+                </h3>
+
+                <p class="text-sm text-white/50">
+                    {{ previewItem?.environment?.name || 'Pasa el mouse sobre una zona para verla.' }}
+                </p>
+
+                <div class="mt-5 overflow-hidden rounded-2xl bg-black/30">
+                    <div v-if="previewItem?.environment?.base_image_url" class="relative">
+                        <img
+                            :src="previewItem.environment.base_image_url"
+                            class="w-full object-cover"
+                        />
+
+                        <img
+                            v-if="previewItem.mask_image_url"
+                            :src="previewItem.mask_image_url"
+                            class="absolute inset-0 h-full w-full object-cover opacity-60 mix-blend-screen"
+                        />
+                    </div>
+
+                    <div v-else class="grid h-72 place-items-center text-white/30">
+                        Sin preview disponible
+                    </div>
+                </div>
+
+                <div v-if="previewItem" class="mt-5 space-y-2 text-sm text-white/60">
+                    <p>
+                        <span class="text-white/40">Tipo:</span>
+                        {{ zoneTypeLabel(previewItem.zone_type) }}
+                    </p>
+                    <p>
+                        <span class="text-white/40">Escala:</span>
+                        {{ previewItem.default_texture_scale }}
+                    </p>
+                    <p>
+                        <span class="text-white/40">Opacidad:</span>
+                        {{ previewItem.default_opacity }}
+                    </p>
+                </div>
+            </aside>
+        </div>
+
+        <div v-if="drawerOpen" class="fixed inset-0 z-50">
+            <div class="absolute inset-0 bg-black/60" @click="drawerOpen = false"></div>
+
+            <div class="absolute right-0 top-0 h-full w-full max-w-3xl overflow-y-auto border-l border-white/10 bg-[#15111D] p-6">
+                <div class="flex items-start justify-between gap-4">
+                    <div>
+                        <p class="text-xs uppercase tracking-[0.25em] text-violet-300">
+                            Zona editable
+                        </p>
+
+                        <h2 class="text-2xl font-bold">
+                            {{ editingItem ? 'Editar zona' : 'Nueva zona' }}
+                        </h2>
+
+                        <p class="mt-1 text-sm text-white/50">
+                            La máscara PNG debe tener el mismo tamaño que la imagen base del ambiente.
+                        </p>
+                    </div>
+
+                    <button class="h-10 w-10 rounded-full bg-white/10 text-xl" @click="drawerOpen = false">
+                        ×
+                    </button>
+                </div>
+
+                <form class="mt-6 grid gap-5 md:grid-cols-2" @submit.prevent="submit">
+                    <div class="md:col-span-2">
+                        <label class="label">Ambiente</label>
+                        <select v-model="form.environment_id" class="input">
+                            <option value="">Seleccionar ambiente</option>
+                            <option v-for="environment in environments" :key="environment.id" :value="environment.id">
+                                {{ environment.name }}
+                            </option>
+                        </select>
+                        <p v-if="form.errors.environment_id" class="error">{{ form.errors.environment_id }}</p>
+                    </div>
+
+                    <div>
+                        <label class="label">Nombre de zona</label>
+                        <input v-model="form.name" class="input" type="text" placeholder="Piso" />
+                        <p v-if="form.errors.name" class="error">{{ form.errors.name }}</p>
+                    </div>
+
+                    <div>
+                        <label class="label">Slug</label>
+                        <input v-model="form.slug" class="input" type="text" placeholder="piso" />
+                    </div>
+
+                    <div>
+                        <label class="label">Tipo de zona</label>
+                        <select v-model="form.zone_type" class="input">
+                            <option value="">Seleccionar</option>
+                            <option value="floor">Piso</option>
+                            <option value="wall">Muro</option>
+                            <option value="countertop">Cubierta / Barra</option>
+                            <option value="backsplash">Backsplash</option>
+                            <option value="island">Isla</option>
+                            <option value="facade">Fachada</option>
+                            <option value="shower_wall">Muro de ducha</option>
+                            <option value="other">Otro</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="label">Orden</label>
+                        <input v-model="form.sort_order" class="input" type="number" min="0" />
+                    </div>
+
+                    <div>
+                        <label class="label">Escala textura</label>
+                        <input v-model="form.default_texture_scale" class="input" type="number" step="0.01" min="0.1" />
+                    </div>
+
+                    <div>
+                        <label class="label">Rotación textura</label>
+                        <input v-model="form.default_texture_rotation" class="input" type="number" step="0.01" />
+                    </div>
+
+                    <div>
+                        <label class="label">Opacidad</label>
+                        <input v-model="form.default_opacity" class="input" type="number" step="0.01" min="0" max="1" />
+                    </div>
+
+                    <div class="flex items-center gap-3 pt-8">
+                        <input v-model="form.supports_perspective" type="checkbox" class="h-5 w-5" />
+                        <label class="text-sm text-white/80">Soporta perspectiva avanzada</label>
+                    </div>
+
+                    <div class="md:col-span-2">
+                        <ImageUploader
+                            label="Máscara PNG"
+                            v-model="form.mask_image"
+                            :current-url="editingItem?.mask_image_url"
+                            @remove="form.remove_mask_image = true"
+                        />
+                    </div>
+
+                    <div class="md:col-span-2 grid gap-5 lg:grid-cols-2">
+                        <div class="rounded-2xl border border-white/10 bg-black/20 p-4">
+                            <p class="mb-3 text-sm font-semibold text-white/80">Preview de ambiente</p>
+
+                            <div class="overflow-hidden rounded-xl bg-black/30">
+                                <img
+                                    v-if="selectedEnvironment?.base_image_url"
+                                    :src="selectedEnvironment.base_image_url"
+                                    class="w-full object-cover"
+                                />
+                                <div v-else class="grid h-48 place-items-center text-white/30">
+                                    Selecciona un ambiente
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="rounded-2xl border border-amber-400/20 bg-amber-500/10 p-4 text-sm text-amber-100">
+                            <p class="font-semibold">Tip para máscaras</p>
+                            <p class="mt-2">
+                                Crea una imagen PNG del mismo tamaño que la base.
+                                La zona editable debe estar visible y el resto transparente.
+                            </p>
+                            <p class="mt-2">
+                                Ejemplo: si la base mide 1600×1000, la máscara también debe medir 1600×1000.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="md:col-span-2">
+                        <label class="label">Puntos del polígono</label>
+                        <textarea
+                            v-model="form.polygon_points"
+                            class="input min-h-24"
+                            placeholder="Reservado para fase posterior"
+                        ></textarea>
+                    </div>
+
+                    <div class="md:col-span-2">
+                        <label class="label">Puntos de perspectiva</label>
+                        <textarea
+                            v-model="form.perspective_points"
+                            class="input min-h-24"
+                            placeholder="Reservado para fase posterior"
+                        ></textarea>
+                    </div>
+
+                    <label class="flex items-center gap-3">
+                        <input v-model="form.is_active" type="checkbox" class="h-5 w-5" />
+                        <span class="text-sm text-white/80">Activa</span>
+                    </label>
+
+                    <button
+                        type="submit"
+                        class="md:col-span-2 rounded-2xl bg-violet-500 py-3 font-semibold text-white hover:bg-violet-600 disabled:opacity-60"
+                        :disabled="form.processing"
+                    >
+                        {{ form.processing ? 'Guardando...' : 'Guardar zona' }}
+                    </button>
+                </form>
+            </div>
+        </div>
+    </BuilderLayout>
+</template>
+
+<script setup>
+import { computed, ref } from 'vue';
+import { router, useForm } from '@inertiajs/vue3';
+import BuilderLayout from '@/Components/AdminBuilder/BuilderLayout.vue';
+import ImageUploader from '@/Components/AdminBuilder/ImageUploader.vue';
+
+const props = defineProps({
+    items: {
+        type: Array,
+        default: () => [],
+    },
+    environments: {
+        type: Array,
+        default: () => [],
+    },
+});
+
+const drawerOpen = ref(false);
+const editingItem = ref(null);
+const previewItem = ref(props.items?.[0] || null);
+
+const form = useForm({
+    environment_id: '',
+    name: '',
+    slug: '',
+    zone_type: '',
+    mask_image: null,
+    remove_mask_image: false,
+    polygon_points: '',
+    default_texture_scale: 1,
+    default_texture_rotation: 0,
+    default_opacity: 1,
+    supports_perspective: false,
+    perspective_points: '',
+    is_active: true,
+    sort_order: 0,
+});
+
+const selectedEnvironment = computed(() => {
+    return props.environments.find((environment) => Number(environment.id) === Number(form.environment_id));
+});
+
+function resetForm() {
+    form.clearErrors();
+    form.reset();
+
+    form.environment_id = '';
+    form.name = '';
+    form.slug = '';
+    form.zone_type = '';
+    form.mask_image = null;
+    form.remove_mask_image = false;
+    form.polygon_points = '';
+    form.default_texture_scale = 1;
+    form.default_texture_rotation = 0;
+    form.default_opacity = 1;
+    form.supports_perspective = false;
+    form.perspective_points = '';
+    form.is_active = true;
+    form.sort_order = 0;
+}
+
+function openCreate() {
+    editingItem.value = null;
+    resetForm();
+    drawerOpen.value = true;
+}
+
+function openEdit(item) {
+    editingItem.value = item;
+    resetForm();
+
+    form.environment_id = item.environment_id || '';
+    form.name = item.name || '';
+    form.slug = item.slug || '';
+    form.zone_type = item.zone_type || '';
+    form.polygon_points = item.polygon_points ? JSON.stringify(item.polygon_points, null, 2) : '';
+    form.default_texture_scale = item.default_texture_scale || 1;
+    form.default_texture_rotation = item.default_texture_rotation || 0;
+    form.default_opacity = item.default_opacity || 1;
+    form.supports_perspective = Boolean(item.supports_perspective);
+    form.perspective_points = item.perspective_points ? JSON.stringify(item.perspective_points, null, 2) : '';
+    form.is_active = Boolean(item.is_active);
+    form.sort_order = item.sort_order || 0;
+
+    drawerOpen.value = true;
+}
+
+function submit() {
+    const options = {
+        forceFormData: true,
+        preserveScroll: true,
+        onSuccess: () => {
+            drawerOpen.value = false;
+        },
+    };
+
+    if (editingItem.value) {
+        form.post(`/admin/builder/environment-zones/${editingItem.value.id}`, options);
+    } else {
+        form.post('/admin/builder/environment-zones', options);
+    }
+}
+
+function destroy(item) {
+    if (!confirm(`¿Eliminar la zona "${item.name}"?`)) return;
+
+    router.delete(`/admin/builder/environment-zones/${item.id}`, {
+        preserveScroll: true,
+    });
+}
+
+function zoneTypeLabel(type) {
+    const labels = {
+        floor: 'Piso',
+        wall: 'Muro',
+        countertop: 'Cubierta / Barra',
+        backsplash: 'Backsplash',
+        island: 'Isla',
+        facade: 'Fachada',
+        shower_wall: 'Muro de ducha',
+        other: 'Otro',
+    };
+
+    return labels[type] || 'Zona';
+}
+</script>
+
+<style scoped>
+.input {
+    width: 100%;
+    border-radius: 1rem;
+    border: 1px solid rgba(255,255,255,.12);
+    background: rgba(255,255,255,.06);
+    padding: .85rem 1rem;
+    color: white;
+    outline: none;
+}
+
+.input:focus {
+    border-color: rgb(139 92 246);
+}
+
+.label {
+    display: block;
+    margin-bottom: .5rem;
+    font-size: .875rem;
+    font-weight: 600;
+    color: rgba(255,255,255,.8);
+}
+
+.error {
+    margin-top: .35rem;
+    font-size: .8rem;
+    color: rgb(252 165 165);
+}
+</style>
