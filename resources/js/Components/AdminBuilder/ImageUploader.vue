@@ -66,11 +66,24 @@ const emit = defineEmits(['update:modelValue', 'remove']);
 
 const preview = ref(props.currentUrl || null);
 
+// Sync when currentUrl changes (switching between different items in the drawer)
 watch(
     () => props.currentUrl,
     (value) => {
         if (!props.modelValue) {
-            preview.value = value;
+            preview.value = value || null;
+        }
+    }
+);
+
+// Restore saved image preview when modelValue is cleared (e.g. form.reset() after
+// clicking × and reopening the same item — currentUrl won't change so the watch
+// above won't fire, but this one will).
+watch(
+    () => props.modelValue,
+    (value) => {
+        if (!value) {
+            preview.value = props.currentUrl || null;
         }
     }
 );

@@ -35,4 +35,12 @@ return [
         ],
     ],
 
+    'replicate' => [
+        'token'       => env('REPLICATE_API_TOKEN'),
+        // SDXL img2img — para el render fotorrealista final
+        'render_model'   => env('REPLICATE_RENDER_MODEL', 'stability-ai/sdxl'),
+        // SAM 2 — para generación automática de máscaras
+        'sam_model'      => env('REPLICATE_SAM_MODEL', 'meta/sam-2'),
+    ],
+
 ];

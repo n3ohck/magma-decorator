@@ -1,126 +1,130 @@
 <template>
-    <div class="h-screen overflow-hidden bg-[#F5F2EC]">
-        <div class="grid h-full overflow-hidden lg:grid-cols-[minmax(0,1fr)_420px] xl:grid-cols-[minmax(0,1fr)_460px]">
-            <!-- Área principal -->
-            <main class="min-w-0 h-full overflow-hidden p-3 md:p-5 flex flex-col">
-                <!-- Header compacto -->
-                <header class="shrink-0 mb-3 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-                    <div class="min-w-0">
-                        <a href="/decorador" class="text-xs md:text-sm text-[#9B6A3F] hover:underline">
-                            ← Cambiar ambiente
+    <div class="h-screen overflow-hidden bg-[#0D0D0D]">
+        <div class="grid h-full overflow-hidden lg:grid-cols-[minmax(0,1fr)_400px] xl:grid-cols-[minmax(0,1fr)_440px]">
+
+            <!-- Canvas area -->
+            <main class="min-w-0 h-full overflow-hidden flex flex-col bg-[#0D0D0D]">
+
+                <!-- Top bar -->
+                <header class="shrink-0 border-b border-white/8 px-5 py-3 flex items-center justify-between gap-4">
+                    <div class="flex items-center gap-4 min-w-0">
+                        <!-- Logo -->
+                        <a href="/" class="shrink-0">
+                            <img
+                                :src="'/images/magma-logo.png'"
+                                alt="Magma Superficies"
+                                class="h-8 w-auto object-contain"
+                                onerror="this.style.display='none'; this.nextElementSibling.style.display='block'"
+                            />
+                            <span
+                                class="hidden text-xs font-bold uppercase tracking-[0.2em] text-white"
+                                style="display:none"
+                            >
+                                Magma
+                            </span>
                         </a>
 
-                        <h1 class="mt-1 text-2xl md:text-3xl font-semibold text-[#1F1A17] leading-tight">
+                        <div class="h-4 w-px bg-white/10 shrink-0" />
+
+                        <a
+                            href="/decorador"
+                            class="text-[10px] uppercase tracking-[0.25em] text-white/35 hover:text-white/70 transition shrink-0"
+                        >
+                            ← Ambientes
+                        </a>
+
+                        <div class="h-4 w-px bg-white/10 shrink-0" />
+
+                        <h1 class="text-sm font-bold text-white uppercase tracking-[0.15em] truncate">
                             {{ environment.name }}
                         </h1>
-
-                        <p class="text-sm text-[#6B5E55] mt-1">
-                            Selecciona una zona y después elige un material.
-                        </p>
                     </div>
 
-                    <div class="hidden md:block rounded-2xl bg-white border border-black/5 px-4 py-2 shadow-sm">
-                        <p class="text-[10px] uppercase tracking-[0.2em] text-[#9B6A3F] font-semibold">
-                            Zona activa
-                        </p>
-
-                        <p class="text-sm font-semibold text-[#1F1A17]">
-                            {{ selectedZone?.name || 'Sin zona seleccionada' }}
-                        </p>
+                    <!-- Active zone pill -->
+                    <div
+                        v-if="selectedZone"
+                        class="hidden md:flex items-center gap-2 border border-white/12 px-3 py-1.5 shrink-0"
+                    >
+                        <span class="h-1.5 w-1.5 bg-[#CC1A1A]" />
+                        <span class="text-[10px] uppercase tracking-[0.2em] text-white/60">
+                            {{ selectedZone.name }}
+                        </span>
                     </div>
                 </header>
 
-                <section class="min-h-0 flex-1 overflow-hidden">
-                    <div class="h-full min-h-0">
-                        <DecoratorCanvas
-                            :environment="environment"
-                            :selected-zone="selectedZone"
-                            :selected-materials="selectedMaterials"
-                            @applying-change="isApplyingMaterial = $event"
-                        />
-                    </div>
+                <!-- Canvas -->
+                <section class="min-h-0 flex-1 overflow-hidden p-3">
+                    <DecoratorCanvas
+                        ref="canvasRef"
+                        :environment="environment"
+                        :selected-zone="selectedZone"
+                        :selected-materials="selectedMaterials"
+                        @applying-change="isApplyingMaterial = $event"
+                    />
                 </section>
 
-                <!-- Resumen compacto inferior -->
-                <section class="shrink-0 mt-3 rounded-2xl bg-white border border-black/5 px-4 py-3 shadow-sm">
-                    <div class="flex items-center justify-between gap-4">
-                        <div class="min-w-0">
-                            <p class="text-[10px] uppercase tracking-[0.2em] text-[#9B6A3F] font-semibold">
-                                Diseño actual
-                            </p>
+                <!-- Applied materials strip -->
+                <footer class="shrink-0 border-t border-white/8 px-4 py-3 flex items-center gap-4">
+                    <div class="min-w-0 flex-1">
+                        <p class="text-[10px] uppercase tracking-[0.3em] text-white/30">
+                            {{ hasAppliedMaterials ? `${appliedMaterialsList.length} material(es) aplicado(s)` : 'Sin materiales aplicados' }}
+                        </p>
 
-                            <p v-if="hasAppliedMaterials" class="text-sm text-[#1F1A17] font-semibold truncate">
-                                {{ appliedMaterialsList.length }} material(es) aplicado(s)
-                            </p>
-
-                            <p v-else class="text-sm text-[#6B5E55] truncate">
-                                Aún no has aplicado materiales.
-                            </p>
-                        </div>
-
-                        <button
-                            type="button"
-                            class="text-sm text-[#9B6A3F] hover:underline disabled:opacity-40 disabled:no-underline shrink-0"
-                            :disabled="!hasAppliedMaterials || isApplyingMaterial"
-                            @click="clearMaterials"
-                        >
-                            Limpiar
-                        </button>
-                    </div>
-
-                    <div v-if="hasAppliedMaterials" class="mt-2 flex gap-2 overflow-x-auto pb-1">
-                        <div
-                            v-for="item in appliedMaterialsList"
-                            :key="item.zone.id"
-                            class="shrink-0 rounded-xl border border-black/5 bg-[#F8F5EF] px-3 py-2 flex items-center gap-2 max-w-[240px]"
-                        >
-                            <img
-                                v-if="item.material.thumbnail_url || item.material.texture_url"
-                                :src="item.material.thumbnail_url || item.material.texture_url"
-                                class="h-8 w-8 rounded-lg object-cover bg-stone-100"
-                                :alt="item.material.name"
-                            />
-
-                            <div class="min-w-0">
-                                <p class="text-xs font-semibold text-[#1F1A17] truncate">
-                                    {{ item.zone.name }}
-                                </p>
-
-                                <p class="text-xs text-[#6B5E55] truncate">
-                                    {{ item.material.name }}
-                                </p>
+                        <div v-if="hasAppliedMaterials" class="mt-2 flex gap-2 overflow-x-auto pb-0.5">
+                            <div
+                                v-for="item in appliedMaterialsList"
+                                :key="item.zone.id"
+                                class="shrink-0 border border-white/10 bg-white/[0.04] px-2.5 py-1.5 flex items-center gap-2 max-w-[200px]"
+                            >
+                                <img
+                                    v-if="item.material.thumbnail_url || item.material.texture_url"
+                                    :src="item.material.thumbnail_url || item.material.texture_url"
+                                    class="h-6 w-6 object-cover bg-black/40"
+                                    :alt="item.material.name"
+                                />
+                                <div class="min-w-0">
+                                    <p class="text-[10px] text-white/60 truncate">{{ item.zone.name }}</p>
+                                    <p class="text-[10px] font-semibold text-white truncate">{{ item.material.name }}</p>
+                                </div>
                             </div>
                         </div>
                     </div>
-                </section>
+
+                    <button
+                        v-if="hasAppliedMaterials"
+                        type="button"
+                        class="shrink-0 text-[10px] uppercase tracking-[0.2em] text-white/30 hover:text-white/60 transition disabled:opacity-30"
+                        :disabled="isApplyingMaterial"
+                        @click="clearMaterials"
+                    >
+                        Limpiar
+                    </button>
+                </footer>
             </main>
 
             <!-- Sidebar -->
-            <aside class="h-full min-h-0 overflow-y-auto bg-white border-l border-black/5">
-                <div class="p-4 md:p-5">
-                    <div class="sticky top-0 bg-white z-10 pb-4">
-                        <p class="text-xs uppercase tracking-[0.25em] text-[#9B6A3F] font-semibold">
-                            Configurador
-                        </p>
+            <aside class="h-full min-h-0 overflow-y-auto bg-[#111111] border-l border-white/8 flex flex-col">
 
-                        <h2 class="text-xl md:text-2xl font-semibold text-[#1F1A17] leading-tight">
-                            Personaliza tu espacio
-                        </h2>
+                <!-- Sidebar header -->
+                <div class="sticky top-0 bg-[#111111] z-10 border-b border-white/8 px-5 py-5">
+                    <p class="text-[10px] uppercase tracking-[0.35em] text-[#CC1A1A] font-semibold">
+                        Configurador
+                    </p>
+                    <h2 class="mt-1 text-xl font-bold text-white uppercase tracking-wide">
+                        Personaliza tu espacio
+                    </h2>
+                </div>
 
-                        <p class="text-sm text-[#6B5E55] mt-1">
-                            Primero selecciona una zona y luego un material.
-                        </p>
-                    </div>
+                <div class="p-5 flex-1 flex flex-col gap-6">
 
-                    <!-- Paso 1 -->
+                    <!-- Step 1 -->
                     <section>
-                        <div class="flex items-center gap-2 mb-3">
-                            <span class="h-7 w-7 rounded-full bg-[#1F1A17] text-white text-sm grid place-items-center font-semibold">
+                        <div class="flex items-center gap-3 mb-3">
+                            <span class="h-6 w-6 bg-white/10 border border-white/15 text-white text-xs grid place-items-center font-bold shrink-0">
                                 1
                             </span>
-
-                            <h3 class="font-semibold text-[#1F1A17]">
-                                Selecciona zona
+                            <h3 class="text-xs uppercase tracking-[0.25em] text-white/70 font-semibold">
+                                Zona
                             </h3>
                         </div>
 
@@ -131,23 +135,30 @@
                         />
                     </section>
 
-                    <!-- Paso 2 -->
-                    <section class="mt-5">
-                        <div class="flex items-center gap-2 mb-3">
-                            <span class="h-7 w-7 rounded-full bg-[#1F1A17] text-white text-sm grid place-items-center font-semibold">
+                    <!-- Step 2 -->
+                    <section>
+                        <div class="flex items-center gap-3 mb-3">
+                            <span
+                                class="h-6 w-6 border text-xs grid place-items-center font-bold shrink-0 transition"
+                                :class="selectedZone
+                                    ? 'bg-white/10 border-white/15 text-white'
+                                    : 'bg-transparent border-white/8 text-white/20'"
+                            >
                                 2
                             </span>
-
-                            <h3 class="font-semibold text-[#1F1A17]">
-                                Selecciona material
+                            <h3
+                                class="text-xs uppercase tracking-[0.25em] font-semibold transition"
+                                :class="selectedZone ? 'text-white/70' : 'text-white/20'"
+                            >
+                                Material
                             </h3>
                         </div>
 
                         <div
                             v-if="!selectedZone"
-                            class="rounded-2xl border border-dashed border-black/10 p-4 text-sm text-[#6B5E55]"
+                            class="border border-dashed border-white/8 p-4 text-xs text-white/25"
                         >
-                            Primero selecciona una zona editable.
+                            Selecciona primero una zona.
                         </div>
 
                         <MaterialSelector
@@ -159,66 +170,101 @@
                         />
                     </section>
 
-                    <!-- Selección actual -->
-                    <section
-                        v-if="selectedZone"
-                        class="mt-5 rounded-2xl bg-[#F8F5EF] border border-black/5 p-4"
-                    >
-                        <p class="text-xs uppercase tracking-[0.2em] text-[#9B6A3F] font-semibold">
-                            Selección actual
+                    <!-- Current selection + adjustments -->
+                    <section v-if="selectedZone" class="border border-white/8 bg-white/[0.03] p-4">
+                        <p class="text-[10px] uppercase tracking-[0.3em] text-white/30 mb-3">
+                            {{ selectedZone.name }}
                         </p>
 
-                        <h3 class="mt-1 text-base font-semibold text-[#1F1A17]">
-                            {{ selectedZone.name }}
-                        </h3>
-
-                        <div v-if="currentZoneMaterial" class="mt-3 flex gap-3 items-center">
+                        <div v-if="currentZoneMaterial" class="flex items-center gap-3">
                             <img
                                 :src="currentZoneMaterial.material.thumbnail_url || currentZoneMaterial.material.texture_url"
-                                class="h-12 w-12 rounded-xl object-cover bg-white"
+                                class="h-10 w-10 object-cover bg-black/40 shrink-0"
                                 :alt="currentZoneMaterial.material.name"
                             />
-
                             <div class="min-w-0">
-                                <p class="text-sm font-semibold text-[#1F1A17] truncate">
+                                <p class="text-sm font-bold text-white truncate">
                                     {{ currentZoneMaterial.material.name }}
                                 </p>
-
-                                <p class="text-xs text-[#6B5E55] truncate">
-                                    {{ currentZoneMaterial.material.finish || currentZoneMaterial.material.base_color || 'Material aplicado' }}
+                                <p class="text-[10px] text-white/40 truncate">
+                                    {{ currentZoneMaterial.material.finish || currentZoneMaterial.material.base_color || 'Aplicado' }}
                                 </p>
                             </div>
                         </div>
 
-                        <p v-else class="mt-3 text-sm text-[#6B5E55]">
-                            No hay material aplicado en esta zona.
+                        <p v-else class="text-xs text-white/30">
+                            Sin material en esta zona.
                         </p>
+
+                        <!-- Sliders -->
+                        <div v-if="currentZoneMaterial" class="mt-4 space-y-4 pt-4 border-t border-white/8">
+                            <div>
+                                <div class="flex items-center justify-between mb-1.5">
+                                    <span class="text-[10px] uppercase tracking-[0.2em] text-white/40">Escala</span>
+                                    <span class="text-xs font-semibold text-white tabular-nums">
+                                        {{ Number(currentZoneMaterial.scale).toFixed(1) }}×
+                                    </span>
+                                </div>
+                                <input
+                                    type="range" min="0.2" max="6" step="0.1"
+                                    :value="currentZoneMaterial.scale"
+                                    :disabled="isApplyingMaterial"
+                                    class="w-full h-px accent-[#CC1A1A] disabled:opacity-30"
+                                    @input="updateAdjustment('scale', Number($event.target.value))"
+                                />
+                            </div>
+
+                            <div>
+                                <div class="flex items-center justify-between mb-1.5">
+                                    <span class="text-[10px] uppercase tracking-[0.2em] text-white/40">Rotación</span>
+                                    <span class="text-xs font-semibold text-white tabular-nums">
+                                        {{ Math.round(currentZoneMaterial.rotation) }}°
+                                    </span>
+                                </div>
+                                <input
+                                    type="range" min="0" max="360" step="1"
+                                    :value="currentZoneMaterial.rotation"
+                                    :disabled="isApplyingMaterial"
+                                    class="w-full h-px accent-[#CC1A1A] disabled:opacity-30"
+                                    @input="updateAdjustment('rotation', Number($event.target.value))"
+                                />
+                            </div>
+
+                            <button
+                                type="button"
+                                class="text-[10px] uppercase tracking-[0.2em] text-white/30 hover:text-white/60 transition disabled:opacity-30"
+                                :disabled="isApplyingMaterial"
+                                @click="resetAdjustments"
+                            >
+                                Restablecer
+                            </button>
+                        </div>
                     </section>
 
-                    <div class="mt-5 space-y-3">
+                    <!-- CTAs -->
+                    <div class="mt-auto space-y-2">
+                        <!-- Solicitar cotización oculto temporalmente
                         <button
                             type="button"
-                            class="w-full h-11 rounded-2xl bg-[#1F1A17] text-white font-semibold hover:bg-black transition disabled:opacity-50"
+                            class="w-full h-12 bg-[#CC1A1A] text-white text-xs font-bold uppercase tracking-[0.25em] hover:bg-[#E01F1F] transition disabled:opacity-40"
                             :disabled="isApplyingMaterial"
                             @click="showLeadForm = true"
                         >
                             Solicitar cotización
                         </button>
+                        -->
 
                         <button
                             type="button"
-                            class="w-full h-11 rounded-2xl border border-[#1F1A17]/20 text-[#1F1A17] font-semibold hover:bg-[#F8F5EF] transition"
+                            class="w-full h-11 border border-white/15 text-white/60 text-xs font-bold uppercase tracking-[0.2em] hover:border-white/35 hover:text-white transition flex items-center justify-center gap-2 disabled:opacity-30"
+                            :disabled="isApplyingMaterial"
+                            @click="showAIRender = true"
                         >
-                            Descargar inspiración
+                            <span class="text-[#CC1A1A]">✦</span>
+                            Render con IA
                         </button>
                     </div>
 
-                    <!-- Debug compacto -->
-                    <div class="mt-5 rounded-2xl bg-stone-50 border border-black/5 p-3 text-xs text-[#6B5E55]">
-                        <p><strong>Zonas:</strong> {{ environment.zones?.length || 0 }}</p>
-                        <p><strong>Categorías:</strong> {{ categories?.length || 0 }}</p>
-                        <p><strong>Materiales activos:</strong> {{ totalMaterials }}</p>
-                    </div>
                 </div>
             </aside>
         </div>
@@ -228,6 +274,13 @@
             :environment="environment"
             :selected-materials="selectedMaterials"
             @close="showLeadForm = false"
+        />
+
+        <AIRenderModal
+            v-if="showAIRender"
+            :capture-canvas="() => canvasRef?.captureImage()"
+            :materials="appliedMaterialsList"
+            @close="showAIRender = false"
         />
     </div>
 </template>
@@ -239,6 +292,7 @@ import DecoratorCanvas from '../../Components/Decorator/DecoratorCanvas.vue';
 import ZoneSelector from '../../Components/Decorator/ZoneSelector.vue';
 import MaterialSelector from '../../Components/Decorator/MaterialSelector.vue';
 import LeadFormDrawer from '../../Components/Decorator/LeadFormDrawer.vue';
+import AIRenderModal from '../../Components/Decorator/AIRenderModal.vue';
 
 const props = defineProps({
     environment: {
@@ -251,9 +305,11 @@ const props = defineProps({
     },
 });
 
+const canvasRef = ref(null);
 const selectedZone = ref(props.environment.zones?.[0] || null);
 const selectedMaterials = ref({});
 const showLeadForm = ref(false);
+const showAIRender = ref(false);
 const isApplyingMaterial = ref(false);
 
 const totalMaterials = computed(() => {
@@ -304,5 +360,31 @@ function applyMaterial(material) {
 
 function clearMaterials() {
     selectedMaterials.value = {};
+}
+
+function updateAdjustment(prop, value) {
+    if (!selectedZone.value || !currentZoneMaterial.value) return;
+    const zoneId = selectedZone.value.id;
+    selectedMaterials.value = {
+        ...selectedMaterials.value,
+        [zoneId]: {
+            ...selectedMaterials.value[zoneId],
+            [prop]: value,
+        },
+    };
+}
+
+function resetAdjustments() {
+    if (!selectedZone.value || !currentZoneMaterial.value) return;
+    const zoneId = selectedZone.value.id;
+    const { material, zone } = selectedMaterials.value[zoneId];
+    selectedMaterials.value = {
+        ...selectedMaterials.value,
+        [zoneId]: {
+            ...selectedMaterials.value[zoneId],
+            scale: Number(material.default_scale || zone.default_texture_scale || 1),
+            rotation: Number(material.default_rotation || zone.default_texture_rotation || 0),
+        },
+    };
 }
 </script>

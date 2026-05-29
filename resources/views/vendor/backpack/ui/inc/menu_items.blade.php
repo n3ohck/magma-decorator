@@ -1,11 +1,6 @@
 {{-- This file is used for menu items by any Backpack v7 theme --}}
 
-<li class="nav-item">
-    <a class="nav-link" href="{{ backpack_url('dashboard') }}">
-        <i class="la la-home nav-icon"></i>
-        {{ trans('backpack::base.dashboard') }}
-    </a>
-</li>
+{{-- Dashboard de Backpack oculto — el admin entra directo al builder --}}
 
 <li class="nav-title px-3 mt-3 text-uppercase text-muted small">
     Decorador Virtual
@@ -41,6 +36,8 @@
     :link="backpack_url('builder/environment-zones')"
 />
 
+{{-- Leads oculto del menú --}}
+{{--
 <li class="nav-title px-3 mt-3 text-uppercase text-muted small">
     Ventas
 </li>
@@ -50,3 +47,4 @@
     icon="la la-user-plus"
     :link="backpack_url('builder/leads')"
 />
+--}}

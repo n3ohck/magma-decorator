@@ -225,12 +225,75 @@
                         <label class="text-sm text-white/80">Soporta perspectiva avanzada</label>
                     </div>
 
+                    <!-- SAM: generación automática de máscara -->
+                    <div v-if="selectedEnvironment?.base_image_url" class="md:col-span-2">
+                        <div class="rounded-2xl border border-violet-500/20 bg-violet-500/5 p-4">
+                            <div class="flex items-center gap-2 mb-3">
+                                <span class="text-sm font-semibold text-violet-300">✦ Generar máscara con IA</span>
+                                <span class="rounded-full bg-violet-500/20 px-2 py-0.5 text-[10px] text-violet-300 font-semibold uppercase tracking-wider">SAM 2</span>
+                            </div>
+
+                            <p class="text-xs text-white/50 mb-3">
+                                Haz click en la zona de la imagen que quieres mascarear.
+                                SAM 2 detectará automáticamente los bordes del área.
+                            </p>
+
+                            <div
+                                ref="samImageRef"
+                                class="relative overflow-hidden rounded-xl cursor-crosshair"
+                                :class="samState === 'loading' ? 'pointer-events-none' : ''"
+                                @click="handleSamClick"
+                            >
+                                <img
+                                    ref="samBaseImageRef"
+                                    :src="selectedEnvironment.base_image_url"
+                                    class="w-full object-cover"
+                                    draggable="false"
+                                />
+
+                                <!-- Mask overlay preview -->
+                                <img
+                                    v-if="samMaskUrl"
+                                    :src="samMaskUrl"
+                                    class="absolute inset-0 w-full h-full object-cover opacity-60 mix-blend-screen pointer-events-none"
+                                />
+
+                                <!-- Click indicator -->
+                                <div
+                                    v-if="samClickPoint"
+                                    class="absolute h-5 w-5 rounded-full border-2 border-violet-400 bg-violet-400/30 -translate-x-1/2 -translate-y-1/2 pointer-events-none"
+                                    :style="{ left: samClickPoint.displayX + 'px', top: samClickPoint.displayY + 'px' }"
+                                />
+
+                                <!-- Loading overlay -->
+                                <div v-if="samState === 'loading'" class="absolute inset-0 flex items-center justify-center bg-black/50">
+                                    <div class="flex items-center gap-2 rounded-xl bg-black/70 px-4 py-2">
+                                        <span class="h-4 w-4 rounded-full border-2 border-violet-400/30 border-t-violet-400 animate-spin" />
+                                        <span class="text-xs text-white">SAM procesando…</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div v-if="samError" class="mt-2 text-xs text-red-300">{{ samError }}</div>
+
+                            <div v-if="samMaskUrl" class="mt-3 flex items-center gap-3">
+                                <span class="text-xs text-emerald-300">✓ Máscara generada</span>
+                                <button type="button" class="text-xs text-violet-300 hover:underline" @click="applySamMask">
+                                    Usar esta máscara
+                                </button>
+                                <button type="button" class="text-xs text-white/40 hover:underline" @click="clearSam">
+                                    Descartar
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="md:col-span-2">
                         <ImageUploader
                             label="Máscara PNG"
                             v-model="form.mask_image"
-                            :current-url="editingItem?.mask_image_url"
-                            @remove="form.remove_mask_image = true"
+                            :current-url="samAppliedMaskUrl || editingItem?.mask_image_url"
+                            @remove="form.remove_mask_image = true; form.sam_mask_path = ''; samAppliedMaskUrl = null"
                         />
                     </div>
 
@@ -301,6 +364,7 @@
 <script setup>
 import { computed, ref } from 'vue';
 import { router, useForm } from '@inertiajs/vue3';
+import axios from 'axios';
 import BuilderLayout from '@/Components/AdminBuilder/BuilderLayout.vue';
 import ImageUploader from '@/Components/AdminBuilder/ImageUploader.vue';
 
@@ -319,6 +383,72 @@ const drawerOpen = ref(false);
 const editingItem = ref(null);
 const previewItem = ref(props.items?.[0] || null);
 
+// SAM state
+const samImageRef = ref(null);
+const samBaseImageRef = ref(null);
+const samState = ref('idle');    // idle | loading | done | error
+const samClickPoint = ref(null); // { displayX, displayY, fracX, fracY }
+const samMaskUrl = ref(null);
+const samMaskPath = ref(null);
+const samAppliedMaskUrl = ref(null);
+const samError = ref('');
+
+async function handleSamClick(event) {
+    if (samState.value === 'loading') return;
+    if (!selectedEnvironment.value?.base_image_url) return;
+
+    const rect = event.currentTarget.getBoundingClientRect();
+    const displayX = event.clientX - rect.left;
+    const displayY = event.clientY - rect.top;
+    const fracX = displayX / rect.width;
+    const fracY = displayY / rect.height;
+
+    samClickPoint.value = { displayX, displayY, fracX, fracY };
+    samMaskUrl.value = null;
+    samMaskPath.value = null;
+    samError.value = '';
+    samState.value = 'loading';
+
+    // Get the natural image dimensions from the img element
+    const imgEl = samBaseImageRef.value;
+    const naturalW = imgEl?.naturalWidth || selectedEnvironment.value.canvas_width || 1200;
+    const naturalH = imgEl?.naturalHeight || selectedEnvironment.value.canvas_height || 1200;
+
+    try {
+        const { data } = await axios.post('/admin/builder/sam-mask', {
+            image_url:    selectedEnvironment.value.base_image_url,
+            x:            fracX,
+            y:            fracY,
+            image_width:  naturalW,
+            image_height: naturalH,
+        });
+
+        samMaskUrl.value  = data.mask_url;
+        samMaskPath.value = data.mask_path;
+        samState.value    = 'done';
+
+    } catch (err) {
+        samError.value = err?.response?.data?.error ?? 'SAM no pudo generar la máscara.';
+        samState.value = 'error';
+    }
+}
+
+function applySamMask() {
+    if (!samMaskUrl.value || !samMaskPath.value) return;
+    form.sam_mask_path   = samMaskPath.value;
+    form.mask_image      = null;          // clear file input — server will use sam_mask_path
+    form.remove_mask_image = false;
+    samAppliedMaskUrl.value = samMaskUrl.value;
+}
+
+function clearSam() {
+    samState.value     = 'idle';
+    samClickPoint.value = null;
+    samMaskUrl.value   = null;
+    samMaskPath.value  = null;
+    samError.value     = '';
+}
+
 const form = useForm({
     environment_id: '',
     name: '',
@@ -332,6 +462,7 @@ const form = useForm({
     default_opacity: 1,
     supports_perspective: false,
     perspective_points: '',
+    sam_mask_path: '',
     is_active: true,
     sort_order: 0,
 });
@@ -363,12 +494,16 @@ function resetForm() {
 function openCreate() {
     editingItem.value = null;
     resetForm();
+    clearSam();
+    samAppliedMaskUrl.value = null;
     drawerOpen.value = true;
 }
 
 function openEdit(item) {
     editingItem.value = item;
     resetForm();
+    clearSam();
+    samAppliedMaskUrl.value = null;
 
     form.environment_id = item.environment_id || '';
     form.name = item.name || '';
@@ -380,6 +515,7 @@ function openEdit(item) {
     form.default_opacity = item.default_opacity || 1;
     form.supports_perspective = Boolean(item.supports_perspective);
     form.perspective_points = item.perspective_points ? JSON.stringify(item.perspective_points, null, 2) : '';
+    form.sam_mask_path = '';
     form.is_active = Boolean(item.is_active);
     form.sort_order = item.sort_order || 0;
 

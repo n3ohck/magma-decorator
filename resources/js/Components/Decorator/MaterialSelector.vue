@@ -1,108 +1,99 @@
 <template>
     <section>
-        <div class="mb-3">
-            <p class="text-xs uppercase tracking-[0.25em] text-[#9B6A3F] font-semibold">
-                Materiales
-            </p>
-
-            <h2 class="text-base font-semibold text-[#1F1A17]">
-                Elige una superficie
-            </h2>
-
-            <p class="text-xs text-[#6B5E55] mt-1">
-                Se aplicará sobre la zona seleccionada.
-            </p>
-        </div>
-
+        <!-- Category tabs -->
         <div
             v-if="categoriesWithMaterials.length"
-            class="flex gap-2 overflow-x-auto pb-2"
+            class="flex gap-1.5 overflow-x-auto pb-2 mb-3"
         >
             <button
                 v-for="category in categoriesWithMaterials"
                 :key="category.id"
                 type="button"
-                class="px-3 py-2 rounded-full text-xs font-semibold whitespace-nowrap border transition disabled:opacity-50 disabled:cursor-not-allowed"
+                class="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.2em] whitespace-nowrap border transition disabled:opacity-40 disabled:cursor-not-allowed"
                 :class="activeCategory?.id === category.id
-                    ? 'bg-[#1F1A17] text-white border-[#1F1A17]'
-                    : 'bg-white text-[#1F1A17] border-black/10 hover:border-[#9B6A3F]'"
+                    ? 'bg-[#CC1A1A] text-white border-[#CC1A1A]'
+                    : 'bg-transparent text-white/50 border-white/15 hover:border-white/35 hover:text-white'"
                 :disabled="disabled"
                 @click="activeCategory = category"
             >
                 {{ category.name }}
-                <span class="opacity-60">
-                    {{ category.materials?.length || 0 }}
-                </span>
+                <span class="ml-1 opacity-50">{{ category.materials?.length || 0 }}</span>
             </button>
         </div>
 
+        <!-- Search -->
         <div v-if="categoriesWithMaterials.length" class="mb-3">
             <input
                 v-model="search"
                 type="text"
-                class="w-full h-10 rounded-2xl border border-black/10 px-4 text-sm outline-none focus:border-[#9B6A3F] disabled:opacity-50"
-                placeholder="Buscar material..."
+                class="w-full h-9 border border-white/10 bg-white/[0.04] px-4 text-xs text-white placeholder:text-white/25 outline-none focus:border-white/30 transition disabled:opacity-40"
+                placeholder="Buscar material…"
                 :disabled="disabled"
             />
         </div>
 
+        <!-- Material list -->
         <div
             v-if="filteredMaterials.length"
-            class="grid grid-cols-1 gap-2 max-h-[260px] overflow-y-auto pr-1"
+            class="flex flex-col gap-1 max-h-[300px] overflow-y-auto pr-0.5"
         >
             <button
                 v-for="material in filteredMaterials"
                 :key="material.id"
                 type="button"
-                class="group text-left rounded-2xl overflow-hidden border bg-white transition disabled:cursor-not-allowed disabled:opacity-60"
+                class="group text-left border bg-white/[0.03] transition disabled:cursor-not-allowed disabled:opacity-40"
                 :class="Number(activeMaterialId) === Number(material.id)
-                    ? 'border-[#9B6A3F] shadow-md ring-2 ring-[#9B6A3F]/10'
-                    : 'border-black/10 hover:shadow-md hover:border-[#9B6A3F]'"
+                    ? 'border-[#CC1A1A] bg-[#CC1A1A]/5'
+                    : 'border-white/8 hover:border-white/25 hover:bg-white/[0.06]'"
                 :disabled="disabled"
                 @click="selectMaterial(material)"
             >
-                <div class="grid grid-cols-[70px_1fr] gap-3 p-2">
-                    <div class="relative h-16 w-16 rounded-xl bg-stone-100 overflow-hidden">
+                <div class="grid grid-cols-[64px_1fr] gap-3 p-2">
+                    <!-- Thumbnail -->
+                    <div class="relative h-14 w-14 bg-black/40 overflow-hidden">
                         <img
                             v-if="material.thumbnail_url || material.texture_url"
                             :src="material.thumbnail_url || material.texture_url"
                             :alt="material.name"
-                            class="w-full h-full object-cover group-hover:scale-105 transition duration-500"
+                            class="w-full h-full object-cover group-hover:scale-110 transition duration-500"
                         />
-
                         <div
                             v-else
-                            class="w-full h-full grid place-items-center text-xs text-[#6B5E55]"
+                            class="w-full h-full grid place-items-center text-[10px] text-white/20"
                         >
-                            Sin imagen
+                            —
                         </div>
 
+                        <!-- Active check -->
                         <transition name="soft-fade">
                             <div
                                 v-if="Number(activeMaterialId) === Number(material.id)"
-                                class="absolute inset-0 bg-[#1F1A17]/20 grid place-items-center"
+                                class="absolute inset-0 bg-[#CC1A1A]/30 grid place-items-center"
                             >
-                                <span class="h-6 w-6 rounded-full bg-white text-[#1F1A17] grid place-items-center text-xs font-bold">
+                                <span class="h-5 w-5 bg-[#CC1A1A] text-white grid place-items-center text-[10px] font-bold">
                                     ✓
                                 </span>
                             </div>
                         </transition>
                     </div>
 
+                    <!-- Info -->
                     <div class="min-w-0 flex flex-col justify-center">
-                        <p class="text-sm font-bold text-[#1F1A17] leading-tight truncate">
+                        <p class="text-sm font-bold text-white leading-tight truncate">
                             {{ material.name }}
                         </p>
 
-                        <p class="text-xs text-[#6B5E55] mt-1 truncate">
+                        <p class="text-[10px] uppercase tracking-[0.15em] text-white/35 mt-1 truncate">
                             {{ activeCategory?.name || 'Material' }}
                         </p>
 
-                        <p class="text-xs text-[#9B6A3F] mt-1 truncate">
-                            {{ material.finish || 'Sin acabado' }}
-                            <span v-if="material.base_color">
-                                · {{ material.base_color }}
-                            </span>
+                        <p
+                            v-if="material.finish || material.base_color"
+                            class="text-[10px] text-[#CC1A1A]/70 mt-0.5 truncate"
+                        >
+                            {{ material.finish }}
+                            <span v-if="material.finish && material.base_color"> · </span>
+                            {{ material.base_color }}
                         </p>
                     </div>
                 </div>
@@ -110,17 +101,14 @@
         </div>
 
         <div
-            v-else-if="categoriesWithMaterials.length"
-            class="rounded-2xl border border-dashed border-black/10 p-4 text-sm text-[#6B5E55]"
-        >
-            No hay materiales que coincidan con la búsqueda.
-        </div>
-
-        <div
             v-else
-            class="rounded-2xl border border-dashed border-black/10 p-4 text-sm text-[#6B5E55]"
+            class="border border-dashed border-white/10 p-4 text-xs text-white/30"
         >
-            No hay materiales activos disponibles.
+            {{
+                categoriesWithMaterials.length
+                    ? 'Sin resultados para esa búsqueda.'
+                    : 'No hay materiales activos disponibles.'
+            }}
         </div>
     </section>
 </template>
@@ -129,18 +117,9 @@
 import { computed, ref, watch } from 'vue';
 
 const props = defineProps({
-    categories: {
-        type: Array,
-        default: () => [],
-    },
-    activeMaterialId: {
-        type: [Number, String, null],
-        default: null,
-    },
-    disabled: {
-        type: Boolean,
-        default: false,
-    },
+    categories: { type: Array, default: () => [] },
+    activeMaterialId: { type: [Number, String, null], default: null },
+    disabled: { type: Boolean, default: false },
 });
 
 const emit = defineEmits(['select']);
@@ -148,69 +127,42 @@ const emit = defineEmits(['select']);
 const search = ref('');
 const activeCategory = ref(null);
 
-const categoriesWithMaterials = computed(() => {
-    return (props.categories || []).filter((category) => {
-        return Array.isArray(category.materials) && category.materials.length > 0;
-    });
-});
+const categoriesWithMaterials = computed(() =>
+    (props.categories || []).filter(
+        (c) => Array.isArray(c.materials) && c.materials.length > 0
+    )
+);
 
 watch(
     categoriesWithMaterials,
-    (categories) => {
-        if (!categories.length) {
-            activeCategory.value = null;
-            return;
-        }
-
-        const currentExists = categories.some((category) => {
-            return category.id === activeCategory.value?.id;
-        });
-
-        if (!activeCategory.value || !currentExists) {
-            activeCategory.value = categories[0];
-        }
+    (cats) => {
+        if (!cats.length) { activeCategory.value = null; return; }
+        const exists = cats.some((c) => c.id === activeCategory.value?.id);
+        if (!activeCategory.value || !exists) activeCategory.value = cats[0];
     },
     { immediate: true }
 );
 
 const filteredMaterials = computed(() => {
-    const materials = activeCategory.value?.materials || [];
-
-    if (!search.value.trim()) {
-        return materials;
-    }
-
+    const list = activeCategory.value?.materials || [];
+    if (!search.value.trim()) return list;
     const term = search.value.toLowerCase();
-
-    return materials.filter((material) => {
-        return [
-            material.name,
-            material.slug,
-            material.sku,
-            material.finish,
-            material.base_color,
-            material.short_description,
-        ]
+    return list.filter((m) =>
+        [m.name, m.slug, m.sku, m.finish, m.base_color, m.short_description]
             .filter(Boolean)
-            .some((value) => String(value).toLowerCase().includes(term));
-    });
+            .some((v) => String(v).toLowerCase().includes(term))
+    );
 });
 
 function selectMaterial(material) {
     if (props.disabled) return;
-
     emit('select', material);
 }
 </script>
 
 <style scoped>
 .soft-fade-enter-active,
-.soft-fade-leave-active {
-    transition: opacity 180ms ease;
-}
-
+.soft-fade-leave-active { transition: opacity 150ms ease; }
 .soft-fade-enter-from,
-.soft-fade-leave-to {
-    opacity: 0;
-}
+.soft-fade-leave-to { opacity: 0; }
 </style>

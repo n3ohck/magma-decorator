@@ -1,26 +1,18 @@
 <template>
     <section>
-        <div class="flex items-center justify-between">
-            <div>
-                <p class="text-xs uppercase tracking-[0.25em] text-[#9B6A3F] font-semibold">
-                    Zonas
-                </p>
+        <p class="text-[10px] uppercase tracking-[0.3em] text-white/35 font-semibold mb-3">
+            ¿Dónde aplicar?
+        </p>
 
-                <h2 class="text-base font-semibold text-[#1F1A17]">
-                    ¿Dónde quieres aplicar material?
-                </h2>
-            </div>
-        </div>
-
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2 gap-2 mt-3">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2 gap-1.5">
             <button
                 v-for="zone in zones"
                 :key="zone.id"
                 type="button"
-                class="rounded-2xl border px-4 py-3 text-left transition disabled:opacity-60 disabled:cursor-not-allowed"
+                class="border px-4 py-3 text-left transition disabled:opacity-40 disabled:cursor-not-allowed"
                 :class="isSelected(zone)
-                    ? 'border-[#1F1A17] bg-[#1F1A17] text-white shadow-md'
-                    : 'border-black/10 bg-white text-[#1F1A17] hover:border-[#9B6A3F]'"
+                    ? 'border-[#CC1A1A] bg-[#CC1A1A]/10 text-white'
+                    : 'border-white/10 bg-white/[0.03] text-white/70 hover:border-white/25 hover:text-white'"
                 :disabled="disabled"
                 @click="$emit('update:modelValue', zone)"
             >
@@ -29,8 +21,8 @@
                 </p>
 
                 <p
-                    class="text-xs mt-1 truncate"
-                    :class="isSelected(zone) ? 'text-white/70' : 'text-[#6B5E55]'"
+                    class="text-[10px] uppercase tracking-[0.2em] mt-1 truncate"
+                    :class="isSelected(zone) ? 'text-[#CC1A1A]/70' : 'text-white/30'"
                 >
                     {{ zone.zone_type || 'Zona editable' }}
                 </p>
@@ -38,9 +30,9 @@
 
             <div
                 v-if="!zones.length"
-                class="rounded-2xl border border-dashed border-black/10 p-4 text-sm text-[#6B5E55]"
+                class="border border-dashed border-white/10 p-4 text-xs text-white/30"
             >
-                Este ambiente todavía no tiene zonas editables.
+                Sin zonas editables configuradas.
             </div>
         </div>
     </section>
@@ -48,18 +40,9 @@
 
 <script setup>
 const props = defineProps({
-    zones: {
-        type: Array,
-        default: () => [],
-    },
-    modelValue: {
-        type: Object,
-        default: null,
-    },
-    disabled: {
-        type: Boolean,
-        default: false,
-    },
+    zones: { type: Array, default: () => [] },
+    modelValue: { type: Object, default: null },
+    disabled: { type: Boolean, default: false },
 });
 
 defineEmits(['update:modelValue']);
