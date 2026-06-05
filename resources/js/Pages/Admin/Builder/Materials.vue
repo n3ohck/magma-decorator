@@ -67,12 +67,12 @@
 
                     <div>
                         <label class="label">Nombre</label>
-                        <input v-model="form.name" class="input" />
+                        <input v-model="form.name" class="input" @input="autoSlug" />
                     </div>
 
                     <div>
                         <label class="label">Slug</label>
-                        <input v-model="form.slug" class="input" />
+                        <input v-model="form.slug" class="input" @input="slugTouched = true" />
                     </div>
 
                     <div>
@@ -162,6 +162,25 @@ const props = defineProps({
 const drawerOpen = ref(false);
 const editingItem = ref(null);
 
+const slugTouched = ref(false);
+
+function toSlug(value) {
+    return value
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[̀-ͯ]/g, '')  // elimina acentos
+        .replace(/[^a-z0-9\s-]/g, '')
+        .trim()
+        .replace(/[\s_]+/g, '-')
+        .replace(/-+/g, '-');
+}
+
+function autoSlug() {
+    if (!slugTouched.value) {
+        form.slug = toSlug(form.name);
+    }
+}
+
 const form = useForm({
     material_category_id: '',
     name: '',
@@ -191,12 +210,14 @@ function resetForm() {
 
 function openCreate() {
     editingItem.value = null;
+    slugTouched.value = false;
     resetForm();
     drawerOpen.value = true;
 }
 
 function openEdit(item) {
     editingItem.value = item;
+    slugTouched.value = true; // al editar, no sobreescribir el slug existente
     resetForm();
 
     Object.assign(form, {

@@ -176,13 +176,13 @@
 
                     <div>
                         <label class="label">Nombre de zona</label>
-                        <input v-model="form.name" class="input" type="text" placeholder="Piso" />
+                        <input v-model="form.name" class="input" type="text" placeholder="Piso" @input="autoSlug" />
                         <p v-if="form.errors.name" class="error">{{ form.errors.name }}</p>
                     </div>
 
                     <div>
                         <label class="label">Slug</label>
-                        <input v-model="form.slug" class="input" type="text" placeholder="piso" />
+                        <input v-model="form.slug" class="input" type="text" placeholder="piso" @input="slugTouched = true" />
                     </div>
 
                     <div>
@@ -225,64 +225,29 @@
                         <label class="text-sm text-white/80">Soporta perspectiva avanzada</label>
                     </div>
 
-                    <!-- SAM: generación automática de máscara -->
+                    <!-- Editor de máscara (polígono + SAM) -->
                     <div v-if="selectedEnvironment?.base_image_url" class="md:col-span-2">
                         <div class="rounded-2xl border border-violet-500/20 bg-violet-500/5 p-4">
-                            <div class="flex items-center gap-2 mb-3">
-                                <span class="text-sm font-semibold text-violet-300">✦ Generar máscara con IA</span>
-                                <span class="rounded-full bg-violet-500/20 px-2 py-0.5 text-[10px] text-violet-300 font-semibold uppercase tracking-wider">SAM 2</span>
+                            <div class="flex items-center gap-2 mb-4">
+                                <span class="text-sm font-semibold text-violet-300">✦ Editor de máscara</span>
+                                <span class="rounded-full bg-violet-500/20 px-2 py-0.5 text-[10px] text-violet-300 font-semibold uppercase tracking-wider">Polígono / SAM 2</span>
                             </div>
 
-                            <p class="text-xs text-white/50 mb-3">
-                                Haz click en la zona de la imagen que quieres mascarear.
-                                SAM 2 detectará automáticamente los bordes del área.
-                            </p>
+                            <MaskEditor
+                                :image-url="selectedEnvironment.base_image_url"
+                                :natural-width="selectedEnvironment.canvas_width || 0"
+                                :natural-height="selectedEnvironment.canvas_height || 0"
+                                @mask-ready="onMaskReady"
+                            />
 
-                            <div
-                                ref="samImageRef"
-                                class="relative overflow-hidden rounded-xl cursor-crosshair"
-                                :class="samState === 'loading' ? 'pointer-events-none' : ''"
-                                @click="handleSamClick"
-                            >
-                                <img
-                                    ref="samBaseImageRef"
-                                    :src="selectedEnvironment.base_image_url"
-                                    class="w-full object-cover"
-                                    draggable="false"
-                                />
-
-                                <!-- Mask overlay preview -->
-                                <img
-                                    v-if="samMaskUrl"
-                                    :src="samMaskUrl"
-                                    class="absolute inset-0 w-full h-full object-cover opacity-60 mix-blend-screen pointer-events-none"
-                                />
-
-                                <!-- Click indicator -->
-                                <div
-                                    v-if="samClickPoint"
-                                    class="absolute h-5 w-5 rounded-full border-2 border-violet-400 bg-violet-400/30 -translate-x-1/2 -translate-y-1/2 pointer-events-none"
-                                    :style="{ left: samClickPoint.displayX + 'px', top: samClickPoint.displayY + 'px' }"
-                                />
-
-                                <!-- Loading overlay -->
-                                <div v-if="samState === 'loading'" class="absolute inset-0 flex items-center justify-center bg-black/50">
-                                    <div class="flex items-center gap-2 rounded-xl bg-black/70 px-4 py-2">
-                                        <span class="h-4 w-4 rounded-full border-2 border-violet-400/30 border-t-violet-400 animate-spin" />
-                                        <span class="text-xs text-white">SAM procesando…</span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div v-if="samError" class="mt-2 text-xs text-red-300">{{ samError }}</div>
-
-                            <div v-if="samMaskUrl" class="mt-3 flex items-center gap-3">
-                                <span class="text-xs text-emerald-300">✓ Máscara generada</span>
-                                <button type="button" class="text-xs text-violet-300 hover:underline" @click="applySamMask">
-                                    Usar esta máscara
-                                </button>
-                                <button type="button" class="text-xs text-white/40 hover:underline" @click="clearSam">
-                                    Descartar
+                            <div v-if="samAppliedMaskUrl" class="mt-3 flex items-center gap-2">
+                                <span class="text-xs text-emerald-300">✓ Máscara aplicada</span>
+                                <button
+                                    type="button"
+                                    class="text-xs text-white/40 hover:underline"
+                                    @click="samAppliedMaskUrl = null; form.sam_mask_path = ''"
+                                >
+                                    Quitar
                                 </button>
                             </div>
                         </div>
@@ -350,6 +315,7 @@ import { router, useForm } from '@inertiajs/vue3';
 import axios from 'axios';
 import BuilderLayout from '@/Components/AdminBuilder/BuilderLayout.vue';
 import ImageUploader from '@/Components/AdminBuilder/ImageUploader.vue';
+import MaskEditor from '@/Components/AdminBuilder/MaskEditor.vue';
 
 const props = defineProps({
     items: {
@@ -418,10 +384,17 @@ async function handleSamClick(event) {
 
 function applySamMask() {
     if (!samMaskUrl.value || !samMaskPath.value) return;
-    form.sam_mask_path   = samMaskPath.value;
-    form.mask_image      = null;          // clear file input — server will use sam_mask_path
+    form.sam_mask_path     = samMaskPath.value;
+    form.mask_image        = null;
     form.remove_mask_image = false;
     samAppliedMaskUrl.value = samMaskUrl.value;
+}
+
+function onMaskReady({ mask_path, mask_url }) {
+    form.sam_mask_path     = mask_path;
+    form.mask_image        = null;
+    form.remove_mask_image = false;
+    samAppliedMaskUrl.value = mask_url;
 }
 
 function clearSam() {
@@ -430,6 +403,23 @@ function clearSam() {
     samMaskUrl.value   = null;
     samMaskPath.value  = null;
     samError.value     = '';
+}
+
+const slugTouched = ref(false);
+
+function toSlug(value) {
+    return value
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[̀-ͯ]/g, '')
+        .replace(/[^a-z0-9\s-]/g, '')
+        .trim()
+        .replace(/[\s_]+/g, '-')
+        .replace(/-+/g, '-');
+}
+
+function autoSlug() {
+    if (!slugTouched.value) form.slug = toSlug(form.name);
 }
 
 const form = useForm({
@@ -476,6 +466,7 @@ function resetForm() {
 
 function openCreate() {
     editingItem.value = null;
+    slugTouched.value = false;
     resetForm();
     clearSam();
     samAppliedMaskUrl.value = null;
@@ -484,6 +475,7 @@ function openCreate() {
 
 function openEdit(item) {
     editingItem.value = item;
+    slugTouched.value = true;
     resetForm();
     clearSam();
     samAppliedMaskUrl.value = null;

@@ -107,13 +107,13 @@
                 <form class="mt-6 space-y-5" @submit.prevent="submit">
                     <div>
                         <label class="block text-sm font-semibold text-white/80 mb-2">Nombre</label>
-                        <input v-model="form.name" class="input" type="text" />
+                        <input v-model="form.name" class="input" type="text" @input="autoSlug" />
                         <p v-if="form.errors.name" class="error">{{ form.errors.name }}</p>
                     </div>
 
                     <div>
                         <label class="block text-sm font-semibold text-white/80 mb-2">Slug</label>
-                        <input v-model="form.slug" class="input" type="text" />
+                        <input v-model="form.slug" class="input" type="text" @input="slugTouched = true" />
                         <p v-if="form.errors.slug" class="error">{{ form.errors.slug }}</p>
                     </div>
 
@@ -168,6 +168,23 @@ defineProps({
 const drawerOpen = ref(false);
 const editingItem = ref(null);
 
+const slugTouched = ref(false);
+
+function toSlug(value) {
+    return value
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[̀-ͯ]/g, '')
+        .replace(/[^a-z0-9\s-]/g, '')
+        .trim()
+        .replace(/[\s_]+/g, '-')
+        .replace(/-+/g, '-');
+}
+
+function autoSlug() {
+    if (!slugTouched.value) form.slug = toSlug(form.name);
+}
+
 const form = useForm({
     name: '',
     slug: '',
@@ -193,12 +210,14 @@ function resetForm() {
 
 function openCreate() {
     editingItem.value = null;
+    slugTouched.value = false;
     resetForm();
     drawerOpen.value = true;
 }
 
 function openEdit(item) {
     editingItem.value = item;
+    slugTouched.value = true;
     resetForm();
 
     form.name = item.name;

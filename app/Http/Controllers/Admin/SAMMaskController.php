@@ -31,30 +31,24 @@ class SAMMaskController extends Controller
         }
 
         $data = $request->validate([
-            'image_url'    => ['required', 'url'],
+            'image_data'   => ['required', 'string'],   // base64 data URI
             'x'            => ['required', 'numeric', 'min:0', 'max:1'],
             'y'            => ['required', 'numeric', 'min:0', 'max:1'],
             'image_width'  => ['required', 'integer', 'min:1'],
             'image_height' => ['required', 'integer', 'min:1'],
         ]);
 
-        // Convert relative coords to absolute pixel coords
         $pixelX = (int) round($data['x'] * $data['image_width']);
         $pixelY = (int) round($data['y'] * $data['image_height']);
 
-        // Create SAM 2 prediction
-        // Model: meta/sam-2 (https://replicate.com/meta/sam-2)
-        // Input keys may vary slightly by model version — update if the model
-        // changes its API. The standard SAM 2 on Replicate accepts:
-        //   image, input_points, input_labels, multimask_output
-        // meta/sam-2 version hash — https://replicate.com/meta/sam-2/versions
+        // Versión de SAM 2 en Replicate
         $version = config(
             'services.replicate.sam_version',
             'fe97b453a6455861e3bac769b441ca1f1086110da7466dbb65cf1eecfd60dc83'
         );
 
         $prediction = $replicate->createPrediction($version, [
-            'image'            => $data['image_url'],
+            'image'            => $data['image_data'],  // base64 — no necesita URL pública
             'input_points'     => [[$pixelX, $pixelY]],
             'input_labels'     => [1],
             'multimask_output' => false,
@@ -86,6 +80,36 @@ class SAMMaskController extends Controller
 
         $filename = 'environments/masks/sam_' . Str::uuid() . '.png';
         Storage::disk('public')->put($filename, $maskResponse->body());
+
+        return response()->json([
+            'mask_path' => $filename,
+            'mask_url'  => Storage::disk('public')->url($filename),
+        ]);
+    }
+
+    /**
+     * POST /admin/builder/mask-upload
+     *
+     * Recibe una máscara en base64 (generada desde el MaskEditor canvas),
+     * la decodifica y la guarda en storage. Devuelve path y URL.
+     */
+    public function upload(Request $request): JsonResponse
+    {
+        $request->validate([
+            'mask_data' => ['required', 'string'],   // data:image/png;base64,...
+        ]);
+
+        $dataUrl = $request->string('mask_data')->toString();
+
+        if (! str_starts_with($dataUrl, 'data:image/')) {
+            return response()->json(['error' => 'Formato inválido.'], 422);
+        }
+
+        $base64  = substr($dataUrl, strpos($dataUrl, ',') + 1);
+        $content = base64_decode($base64);
+
+        $filename = 'environments/masks/mask_' . Str::uuid() . '.png';
+        Storage::disk('public')->put($filename, $content);
 
         return response()->json([
             'mask_path' => $filename,

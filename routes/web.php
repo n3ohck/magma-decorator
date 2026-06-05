@@ -48,3 +48,7 @@ Route::get('/decorador/ai-render/{id}/status', [AIRenderController::class, 'stat
 // SAM automatic mask generation (admin)
 Route::post('/admin/builder/sam-mask', [SAMMaskController::class, 'generate'])
     ->name('admin.sam-mask');
+
+// Direct mask PNG upload from MaskEditor canvas
+Route::post('/admin/builder/mask-upload', [SAMMaskController::class, 'upload'])
+    ->name('admin.mask-upload');
