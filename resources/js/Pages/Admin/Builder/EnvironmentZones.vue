@@ -316,6 +316,9 @@ import axios from 'axios';
 import BuilderLayout from '@/Components/AdminBuilder/BuilderLayout.vue';
 import ImageUploader from '@/Components/AdminBuilder/ImageUploader.vue';
 import MaskEditor from '@/Components/AdminBuilder/MaskEditor.vue';
+import { useToast } from '@/composables/useToast.js';
+
+const toast = useToast();
 
 const props = defineProps({
     items: {
@@ -390,11 +393,13 @@ function applySamMask() {
     samAppliedMaskUrl.value = samMaskUrl.value;
 }
 
-function onMaskReady({ mask_path, mask_url }) {
-    form.sam_mask_path     = mask_path;
-    form.mask_image        = null;
+function onMaskReady({ file, preview_url }) {
+    // Assign the File directly to form.mask_image — uses the normal upload path
+    // on form submission, bypassing the sam_mask_path string field entirely.
+    form.mask_image        = file;
+    form.sam_mask_path     = '';
     form.remove_mask_image = false;
-    samAppliedMaskUrl.value = mask_url;
+    samAppliedMaskUrl.value = preview_url;
 }
 
 function clearSam() {
@@ -503,6 +508,14 @@ function submit() {
         preserveScroll: true,
         onSuccess: () => {
             drawerOpen.value = false;
+            toast.success(
+                editingItem.value ? 'Zona actualizada correctamente.' : 'Zona creada correctamente.',
+                editingItem.value ? 'Zona actualizada' : 'Zona creada'
+            );
+        },
+        onError: (errors) => {
+            const first = Object.values(errors)[0];
+            toast.error(first ?? 'Revisa los campos del formulario.', 'Error al guardar');
         },
     };
 
@@ -518,6 +531,8 @@ function destroy(item) {
 
     router.delete(`/admin/builder/environment-zones/${item.id}`, {
         preserveScroll: true,
+        onSuccess: () => toast.success('Zona eliminada.', 'Eliminada'),
+        onError:   () => toast.error('No se pudo eliminar la zona.', 'Error'),
     });
 }
 

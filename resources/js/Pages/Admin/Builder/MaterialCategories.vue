@@ -235,7 +235,9 @@ function submit() {
         forceFormData: true,
         onSuccess: () => {
             drawerOpen.value = false;
+            toast.success(editingItem.value ? 'Categoría actualizada.' : 'Categoría creada.', '¡Listo!');
         },
+        onError: (errors) => toast.error(Object.values(errors)[0] ?? 'Revisa el formulario.', 'Error'),
     };
 
     if (editingItem.value) {
@@ -250,6 +252,8 @@ function destroy(item) {
 
     router.delete(`/admin/builder/material-categories/${item.id}`, {
         preserveScroll: true,
+        onSuccess: () => toast.success(`"${item.name}" eliminada.`, 'Eliminada'),
+        onError:   () => toast.error('No se pudo eliminar la categoría.', 'Error'),
     });
 }
 </script>

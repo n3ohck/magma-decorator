@@ -1,5 +1,6 @@
 <template>
     <div class="min-h-screen bg-[#0D0B10] text-[#EDE7F6]">
+    <Toast ref="toastRef" />
         <div class="flex">
             <aside class="hidden lg:flex lg:w-72 h-screen sticky top-0 border-r border-white/10 bg-[#15111D] flex-col overflow-y-auto">
                 <div class="p-6 border-b border-white/10">
@@ -88,7 +89,13 @@
 </template>
 
 <script setup>
-import { h } from 'vue';
+import { h, onMounted, ref } from 'vue';
+import Toast from '@/Components/AdminBuilder/Toast.vue';
+import { useToast } from '@/composables/useToast.js';
+
+const toastRef = ref(null);
+const { setInstance } = useToast();
+onMounted(() => setInstance(toastRef.value));
 
 defineProps({
     title: { type: String, default: 'Builder' },

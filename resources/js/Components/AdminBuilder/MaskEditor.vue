@@ -364,26 +364,29 @@ async function uploadAndEmit(dataUrl) {
     uploadError.value = '';
 
     try {
-        const csrf = document.querySelector('meta[name="csrf-token"]')?.content;
-        const { data } = await axios.post('/admin/builder/mask-upload', {
-            mask_data: dataUrl,
-        }, {
-            headers: csrf ? { 'X-CSRF-TOKEN': csrf } : {},
-        });
+        // Convert data URL to a File object — the parent form will upload it
+        // via the normal mask_image file field, avoiding sam_mask_path edge-cases.
+        const file = dataUrlToFile(dataUrl, 'mask.png');
 
         uploadState.value = 'done';
         emit('mask-ready', {
-            mask_path: data.mask_path,
-            mask_url:  data.mask_url,
-            data_url:  dataUrl,
+            file,
+            preview_url: dataUrl,
         });
     } catch (e) {
         uploadState.value = 'error';
-        uploadError.value = e?.response?.data?.error
-            ?? e?.response?.data?.message
-            ?? `Error ${e?.response?.status ?? ''}: No se pudo guardar la máscara.`;
-        console.error('MaskEditor upload error', e);
+        uploadError.value = 'No se pudo procesar la máscara: ' + (e?.message ?? 'error desconocido');
+        console.error('MaskEditor error', e);
     }
+}
+
+function dataUrlToFile(dataUrl, filename) {
+    const [header, b64] = dataUrl.split(',');
+    const mime   = header.match(/:(.*?);/)[1];
+    const binary = atob(b64);
+    const bytes  = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    return new File([bytes], filename, { type: mime });
 }
 
 // ── SAM tool ──────────────────────────────────────────────────────────────────

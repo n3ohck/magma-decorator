@@ -360,7 +360,9 @@ function submit() {
         preserveScroll: true,
         onSuccess: () => {
             drawerOpen.value = false;
+            toast.success(editingItem.value ? 'Ambiente actualizado.' : 'Ambiente creado.', '¡Listo!');
         },
+        onError: (errors) => toast.error(Object.values(errors)[0] ?? 'Revisa el formulario.', 'Error'),
     };
 
     if (editingItem.value) {
@@ -375,6 +377,8 @@ function destroy(item) {
 
     router.delete(`/admin/builder/environments/${item.id}`, {
         preserveScroll: true,
+        onSuccess: () => toast.success(`"${item.name}" eliminado.`, 'Eliminado'),
+        onError:   () => toast.error('No se pudo eliminar el ambiente.', 'Error'),
     });
 }
 
