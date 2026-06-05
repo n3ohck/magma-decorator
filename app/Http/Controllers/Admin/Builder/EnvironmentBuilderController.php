@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin\Builder;
 
 use App\Http\Controllers\Controller;
 use App\Models\Environment;
+use App\Services\ImageOptimizer;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -22,7 +23,7 @@ class EnvironmentBuilderController extends Controller
         ]);
     }
 
-    public function store(Request $request)
+    public function store(Request $request, ImageOptimizer $optimizer)
     {
         $data = $this->validatedData($request);
 
@@ -30,9 +31,9 @@ class EnvironmentBuilderController extends Controller
             $data['slug'] = Str::slug($data['name']);
         }
 
-        foreach ($this->imageFields() as $field => $folder) {
+        foreach ($this->imageFields() as $field => [$folder, $profile]) {
             if ($request->hasFile($field)) {
-                $data[$field] = $request->file($field)->store($folder, 'public');
+                $data[$field] = $optimizer->store($request->file($field), $folder, $profile);
             }
         }
 
@@ -41,7 +42,7 @@ class EnvironmentBuilderController extends Controller
         return back()->with('success', 'Ambiente creado correctamente.');
     }
 
-    public function update(Request $request, Environment $environment)
+    public function update(Request $request, Environment $environment, ImageOptimizer $optimizer)
     {
         $data = $this->validatedData($request, $environment->id);
 
@@ -49,7 +50,7 @@ class EnvironmentBuilderController extends Controller
             $data['slug'] = Str::slug($data['name']);
         }
 
-        foreach ($this->imageFields() as $field => $folder) {
+        foreach ($this->imageFields() as $field => [$folder, $profile]) {
             $removeField = 'remove_' . $field;
 
             if ($request->boolean($removeField)) {
@@ -59,7 +60,7 @@ class EnvironmentBuilderController extends Controller
 
             if ($request->hasFile($field)) {
                 $this->deleteFile($environment->{$field});
-                $data[$field] = $request->file($field)->store($folder, 'public');
+                $data[$field] = $optimizer->store($request->file($field), $folder, $profile);
             }
         }
 
@@ -101,12 +102,13 @@ class EnvironmentBuilderController extends Controller
 
     private function imageFields(): array
     {
+        // [folder, optimizer_profile]
         return [
-            'base_image' => 'environments/base',
-            'preview_image' => 'environments/previews',
-            'shadow_overlay_image' => 'environments/overlays/shadows',
-            'light_overlay_image' => 'environments/overlays/lights',
-            'foreground_overlay_image' => 'environments/overlays/foregrounds',
+            'base_image'              => ['environments/base',              'base'],
+            'preview_image'           => ['environments/previews',          'preview'],
+            'shadow_overlay_image'    => ['environments/overlays/shadows',  'overlay'],
+            'light_overlay_image'     => ['environments/overlays/lights',   'overlay'],
+            'foreground_overlay_image'=> ['environments/overlays/foregrounds', 'overlay'],
         ];
     }
 

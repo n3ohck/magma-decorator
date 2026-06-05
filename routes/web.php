@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AIRenderController;
+use Illuminate\Support\Facades\Auth;
 use App\Http\Controllers\WordPressAuthController;
 use App\Http\Controllers\Admin\SAMMaskController;
 use App\Http\Controllers\DecoratorController;
@@ -14,6 +15,14 @@ Route::get('/', function () {
 // WordPress SSO — token firmado desde el plugin WP
 Route::get('/admin/auth/wordpress', [WordPressAuthController::class, 'login'])
     ->name('admin.auth.wordpress');
+
+// Logout admin via GET — evita CSRF en el panel builder
+Route::get('/admin/do-logout', function () {
+    Auth::guard(backpack_guard_name())->logout();
+    request()->session()->invalidate();
+    request()->session()->regenerateToken();
+    return redirect(backpack_url('login'));
+})->middleware('web')->name('admin.do-logout');
 
 // Backpack dashboard → redirect al builder del decorador
 Route::get('/admin/dashboard', function () {

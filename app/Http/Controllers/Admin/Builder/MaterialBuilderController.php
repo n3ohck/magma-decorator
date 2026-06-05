@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin\Builder;
 use App\Http\Controllers\Controller;
 use App\Models\Material;
 use App\Models\MaterialCategory;
+use App\Services\ImageOptimizer;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -28,7 +29,7 @@ class MaterialBuilderController extends Controller
         ]);
     }
 
-    public function store(Request $request)
+    public function store(Request $request, ImageOptimizer $optimizer)
     {
         $data = $this->validatedData($request);
 
@@ -37,13 +38,15 @@ class MaterialBuilderController extends Controller
         }
 
         if ($request->hasFile('texture_image')) {
-            $data['texture_image'] = $request->file('texture_image')
-                ->store('materials/textures', 'public');
+            $data['texture_image'] = $optimizer->store(
+                $request->file('texture_image'), 'materials/textures', 'texture'
+            );
         }
 
         if ($request->hasFile('thumbnail_image')) {
-            $data['thumbnail_image'] = $request->file('thumbnail_image')
-                ->store('materials/thumbnails', 'public');
+            $data['thumbnail_image'] = $optimizer->store(
+                $request->file('thumbnail_image'), 'materials/thumbnails', 'thumbnail'
+            );
         }
 
         Material::create($data);
@@ -51,7 +54,7 @@ class MaterialBuilderController extends Controller
         return back()->with('success', 'Material creado correctamente.');
     }
 
-    public function update(Request $request, Material $material)
+    public function update(Request $request, Material $material, ImageOptimizer $optimizer)
     {
         $data = $this->validatedData($request, $material->id);
 
@@ -71,16 +74,16 @@ class MaterialBuilderController extends Controller
 
         if ($request->hasFile('texture_image')) {
             $this->deleteFile($material->texture_image);
-
-            $data['texture_image'] = $request->file('texture_image')
-                ->store('materials/textures', 'public');
+            $data['texture_image'] = $optimizer->store(
+                $request->file('texture_image'), 'materials/textures', 'texture'
+            );
         }
 
         if ($request->hasFile('thumbnail_image')) {
             $this->deleteFile($material->thumbnail_image);
-
-            $data['thumbnail_image'] = $request->file('thumbnail_image')
-                ->store('materials/thumbnails', 'public');
+            $data['thumbnail_image'] = $optimizer->store(
+                $request->file('thumbnail_image'), 'materials/thumbnails', 'thumbnail'
+            );
         }
 
         $material->update($data);
