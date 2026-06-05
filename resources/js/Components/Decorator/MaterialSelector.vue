@@ -51,11 +51,19 @@
                 <div class="grid grid-cols-[64px_1fr] gap-3 p-2">
                     <!-- Thumbnail -->
                     <div class="relative h-14 w-14 bg-black/40 overflow-hidden">
+                        <!-- Skeleton shimmer mientras carga -->
+                        <div
+                            v-if="!loadedImages.has(material.id)"
+                            class="absolute inset-0 skeleton-shimmer"
+                        />
                         <img
                             v-if="material.thumbnail_url || material.texture_url"
                             :src="material.thumbnail_url || material.texture_url"
                             :alt="material.name"
                             class="w-full h-full object-cover group-hover:scale-110 transition duration-500"
+                            :class="loadedImages.has(material.id) ? 'opacity-100' : 'opacity-0'"
+                            @load="loadedImages.add(material.id)"
+                            @error="loadedImages.add(material.id)"
                         />
                         <div
                             v-else
@@ -127,6 +135,9 @@ const emit = defineEmits(['select']);
 const search = ref('');
 const activeCategory = ref(null);
 
+// Tracking de imágenes cargadas para el skeleton
+const loadedImages = ref(new Set());
+
 const categoriesWithMaterials = computed(() =>
     (props.categories || []).filter(
         (c) => Array.isArray(c.materials) && c.materials.length > 0
@@ -165,4 +176,21 @@ function selectMaterial(material) {
 .soft-fade-leave-active { transition: opacity 150ms ease; }
 .soft-fade-enter-from,
 .soft-fade-leave-to { opacity: 0; }
+
+/* Shimmer skeleton para thumbnails */
+.skeleton-shimmer {
+    background: linear-gradient(
+        90deg,
+        rgba(255,255,255,0.04) 0%,
+        rgba(255,255,255,0.10) 40%,
+        rgba(255,255,255,0.04) 80%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+    0%   { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
 </style>
