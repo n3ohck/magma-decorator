@@ -396,12 +396,10 @@ async function composeTextureWithMask(textureUrl, maskUrl, baseImg, width, heigh
     ctx.fillRect(0, 0, width, height);
     ctx.globalCompositeOperation = 'source-over';
 
-    const output = new Image();
-
-    return new Promise((resolve) => {
-        output.onload = () => resolve(output);
-        output.src = canvas.toDataURL('image/png');
-    });
+    // Devolvemos el canvas directamente — Konva lo acepta como fuente de imagen.
+    // Evita el ciclo encode PNG → decode Image que introducía una vuelta asíncrona
+    // extra y podía dejar el canvas en estado inconsistente durante animaciones.
+    return canvas;
 }
 
 function generateGrainImage(width, height) {
@@ -562,6 +560,13 @@ async function renderZonesWithTransition() {
 
         await nextTick();
         await fadeRenderedZones(1, 280);
+
+        // Re-render final garantizado: la animación de fade puede dejar el canvas
+        // en estado inconsistente si el token cambió a mitad. Este render instantáneo
+        // asegura que el estado visible siempre coincide con selectedMaterials actual.
+        if (token === renderToken) {
+            await renderZonesInstant();
+        }
     } finally {
         if (token === renderToken) {
             foregroundOpacity.value = 1;
