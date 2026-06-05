@@ -36,10 +36,9 @@ class AIRenderController extends Controller
             return response()->json(['error' => 'Formato de imagen inválido.'], 422);
         }
 
-        // Pass the data URI directly to Replicate — no public URL needed.
-        // Real-ESRGAN (and most Replicate models) accept base64 data URIs,
-        // which avoids the need for ngrok or a public server in development.
-        $imageUrl = $dataUrl;
+        // Resize if needed: Real-ESRGAN GPU max ≈ 2,096,704 px.
+        // We cap at 1,800,000 px to be safe (scale=2 upscale stays within VRAM).
+        $imageUrl = $this->resizeIfNeeded($dataUrl, 1_800_000);
 
         // nightmareai/real-esrgan — upscale + AI enhancement
         // Sharpens and adds photorealistic detail to the composite without
@@ -72,6 +71,48 @@ class AIRenderController extends Controller
             'prediction_id' => $prediction['id'],
             'status'        => $prediction['status'],
         ]);
+    }
+
+    /**
+     * Resize a base64 data URI so its total pixel count ≤ $maxPixels.
+     * Keeps aspect ratio. Falls back to the original if GD is unavailable.
+     */
+    private function resizeIfNeeded(string $dataUrl, int $maxPixels): string
+    {
+        try {
+            $base64 = substr($dataUrl, strpos($dataUrl, ',') + 1);
+            $binary = base64_decode($base64);
+            $src    = imagecreatefromstring($binary);
+
+            if (! $src) return $dataUrl;
+
+            $w      = imagesx($src);
+            $h      = imagesy($src);
+            $pixels = $w * $h;
+
+            if ($pixels <= $maxPixels) {
+                imagedestroy($src);
+                return $dataUrl;  // already fits
+            }
+
+            $ratio = sqrt($maxPixels / $pixels);
+            $nw    = (int) floor($w * $ratio);
+            $nh    = (int) floor($h * $ratio);
+
+            $dst = imagecreatetruecolor($nw, $nh);
+            imagecopyresampled($dst, $src, 0, 0, 0, 0, $nw, $nh, $w, $h);
+
+            ob_start();
+            imagejpeg($dst, null, 90);
+            $resized = ob_get_clean();
+
+            imagedestroy($src);
+            imagedestroy($dst);
+
+            return 'data:image/jpeg;base64,' . base64_encode($resized);
+        } catch (\Throwable) {
+            return $dataUrl;  // never fail — send original
+        }
     }
 
     /**
