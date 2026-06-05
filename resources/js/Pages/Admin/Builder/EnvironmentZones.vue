@@ -394,9 +394,8 @@ function applySamMask() {
 }
 
 function onMaskReady({ file, preview_url }) {
-    // Assign the File directly to form.mask_image — uses the normal upload path
-    // on form submission, bypassing the sam_mask_path string field entirely.
-    form.mask_image        = file;
+    maskFile.value         = file;     // stored outside Inertia form — File survives
+    form.mask_image        = null;
     form.sam_mask_path     = '';
     form.remove_mask_image = false;
     samAppliedMaskUrl.value = preview_url;
@@ -411,6 +410,7 @@ function clearSam() {
 }
 
 const slugTouched = ref(false);
+const maskFile    = ref(null); // File ref outside Inertia form to prevent JSON-clone loss
 
 function toSlug(value) {
     return value
@@ -472,6 +472,7 @@ function resetForm() {
 function openCreate() {
     editingItem.value = null;
     slugTouched.value = false;
+    maskFile.value    = null;
     resetForm();
     clearSam();
     samAppliedMaskUrl.value = null;
@@ -481,6 +482,7 @@ function openCreate() {
 function openEdit(item) {
     editingItem.value = item;
     slugTouched.value = true;
+    maskFile.value    = null;
     resetForm();
     clearSam();
     samAppliedMaskUrl.value = null;
@@ -503,10 +505,41 @@ function openEdit(item) {
 }
 
 function submit() {
-    const options = {
-        forceFormData: true,
+    // Build FormData manually so File objects are guaranteed to be included.
+    // Inertia's useForm may clone state through JSON (losing File objects).
+    const fd = new FormData();
+
+    fd.append('environment_id',         form.environment_id ?? '');
+    fd.append('name',                   form.name ?? '');
+    fd.append('slug',                   form.slug ?? '');
+    fd.append('zone_type',              form.zone_type ?? '');
+    fd.append('default_texture_scale',  form.default_texture_scale ?? 1);
+    fd.append('default_texture_rotation', form.default_texture_rotation ?? 0);
+    fd.append('default_opacity',        form.default_opacity ?? 1);
+    fd.append('supports_perspective',   form.supports_perspective ? '1' : '0');
+    fd.append('is_active',              form.is_active ? '1' : '0');
+    fd.append('sort_order',             form.sort_order ?? 0);
+    fd.append('remove_mask_image',      form.remove_mask_image ? '1' : '0');
+
+    if (maskFile.value instanceof File) {
+        fd.append('mask_image', maskFile.value, 'mask.png');
+    } else if (form.mask_image instanceof File) {
+        fd.append('mask_image', form.mask_image, 'mask.png');
+    } else if (form.sam_mask_path) {
+        fd.append('sam_mask_path', form.sam_mask_path);
+    }
+
+    const url = editingItem.value
+        ? `/admin/builder/environment-zones/${editingItem.value.id}`
+        : '/admin/builder/environment-zones';
+
+    form.processing = true;
+
+    router.post(url, fd, {
         preserveScroll: true,
         onSuccess: () => {
+            form.processing = false;
+            maskFile.value  = null;
             drawerOpen.value = false;
             toast.success(
                 editingItem.value ? 'Zona actualizada correctamente.' : 'Zona creada correctamente.',
@@ -514,16 +547,11 @@ function submit() {
             );
         },
         onError: (errors) => {
+            form.processing = false;
             const first = Object.values(errors)[0];
             toast.error(first ?? 'Revisa los campos del formulario.', 'Error al guardar');
         },
-    };
-
-    if (editingItem.value) {
-        form.post(`/admin/builder/environment-zones/${editingItem.value.id}`, options);
-    } else {
-        form.post('/admin/builder/environment-zones', options);
-    }
+    });
 }
 
 function destroy(item) {
