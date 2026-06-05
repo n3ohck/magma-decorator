@@ -53,19 +53,19 @@
             </button>
         </div>
 
-        <!-- Canvas container — forced to canvas_width:canvas_height ratio so the
-             drawing coordinate space exactly matches the mask coordinate space.
-             If the image has a different ratio it shows letterboxed (object-contain). -->
+        <!-- Canvas container — forced to canvas_width:canvas_height ratio.
+             Image uses object-fill to stretch exactly like the Decorator does,
+             so polygon coordinates map 1:1 to the mask and the Konva canvas. -->
         <div
-            class="relative overflow-hidden rounded-xl select-none w-full bg-black/20"
+            class="relative overflow-hidden rounded-xl select-none w-full"
             :style="canvasRatio ? { aspectRatio: canvasRatio } : {}"
             :class="activeTool === 'polygon' && !maskReady ? 'cursor-crosshair' : 'cursor-default'"
         >
-            <!-- Base image (letterboxed to canvas ratio if needed) -->
+            <!-- Base image stretched to fill — same rendering as the Decorator -->
             <img
                 ref="imgRef"
                 :src="imageUrl"
-                class="absolute inset-0 w-full h-full object-contain"
+                class="absolute inset-0 w-full h-full object-fill"
                 draggable="false"
                 @load="onImageLoad"
             />
@@ -153,10 +153,10 @@
                 class="relative overflow-hidden rounded-xl w-full bg-black/20"
                 :style="canvasRatio ? { aspectRatio: canvasRatio } : {}"
             >
-                <img :src="imageUrl" class="absolute inset-0 w-full h-full object-contain" />
+                <img :src="imageUrl" class="absolute inset-0 w-full h-full object-fill" />
                 <img
                     :src="maskDataUrl"
-                    class="absolute inset-0 w-full h-full object-contain pointer-events-none"
+                    class="absolute inset-0 w-full h-full object-fill pointer-events-none"
                     style="mix-blend-mode: screen; opacity: 0.65;"
                 />
             </div>
