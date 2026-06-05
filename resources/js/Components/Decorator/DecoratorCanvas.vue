@@ -165,8 +165,20 @@ let renderToken = 0;
 const isApplying = ref(false);
 const foregroundOpacity = ref(1);
 
-const canvasWidth = computed(() => Number(props.environment.canvas_width || 1200));
-const canvasHeight = computed(() => Number(props.environment.canvas_height || 1200));
+// Effective canvas dimensions: use the base image's NATURAL dimensions once loaded,
+// falling back to environment.canvas_width/height. This avoids stretching the image
+// when the configured canvas dimensions don't match the actual image proportions.
+const imageNaturalWidth  = ref(0);
+const imageNaturalHeight = ref(0);
+
+const canvasWidth = computed(() => {
+    if (imageNaturalWidth.value  > 0) return imageNaturalWidth.value;
+    return Number(props.environment.canvas_width  || 1200);
+});
+const canvasHeight = computed(() => {
+    if (imageNaturalHeight.value > 0) return imageNaturalHeight.value;
+    return Number(props.environment.canvas_height || 1200);
+});
 
 const availableWidth = computed(() => {
     return Math.max(1, containerWidth.value - 24);
@@ -431,8 +443,16 @@ function generateGrainImage(width, height) {
 
 async function loadBaseImages() {
     baseImage.value = await loadImage(props.environment.base_image_url);
-    shadowImage.value = await loadImage(props.environment.shadow_overlay_url);
-    lightImage.value = await loadImage(props.environment.light_overlay_url);
+
+    // Use actual image dimensions as the coordinate space — avoids stretching
+    // when canvas_width/height don't match the uploaded image proportions.
+    if (baseImage.value?.naturalWidth) {
+        imageNaturalWidth.value  = baseImage.value.naturalWidth;
+        imageNaturalHeight.value = baseImage.value.naturalHeight;
+    }
+
+    shadowImage.value     = await loadImage(props.environment.shadow_overlay_url);
+    lightImage.value      = await loadImage(props.environment.light_overlay_url);
     foregroundImage.value = await loadImage(props.environment.foreground_overlay_url);
 }
 

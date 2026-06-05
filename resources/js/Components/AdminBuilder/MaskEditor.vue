@@ -373,8 +373,11 @@ async function savePolygonMask() {
 
     // Step 2: scale up to natural (canvas_width × canvas_height).
     // drawImage handles the proportional scaling; no manual math needed.
-    const natW = props.naturalWidth  || imgRef.value?.naturalWidth  || dw;
-    const natH = props.naturalHeight || imgRef.value?.naturalHeight || dh;
+    // Use the IMAGE's actual pixel dimensions for the mask — not canvas_width/height.
+    // The Decorator now uses image natural dimensions as the coordinate space,
+    // so masks must match the image size exactly to avoid stretching/misalignment.
+    const natW = imgRef.value?.naturalWidth  || props.naturalWidth  || dw;
+    const natH = imgRef.value?.naturalHeight || props.naturalHeight || dh;
 
     const mc  = document.createElement('canvas');
     mc.width  = natW;
