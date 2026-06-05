@@ -59,7 +59,9 @@
         <div
             class="relative overflow-hidden rounded-xl select-none w-full"
             :style="canvasRatio ? { aspectRatio: canvasRatio } : {}"
-            :class="activeTool === 'polygon' && !maskReady ? 'cursor-crosshair' : 'cursor-default'"
+            :class="activeTool === 'polygon' && !maskReady
+                ? (nearFirstPoint ? 'cursor-pointer' : 'cursor-crosshair')
+                : 'cursor-default'"
         >
             <!-- Base image stretched to fill — same rendering as the Decorator -->
             <img
@@ -258,17 +260,46 @@ function fracToNat({ fx, fy }) {
 
 function onCanvasClick(e) {
     if (maskReady.value) return;
-    syncCanvasSize(); // ensure canvas dimensions are current
-    points.value.push(eventToFrac(e, canvasRef.value));
+    syncCanvasSize();
+
+    const frac = eventToFrac(e, canvasRef.value);
+
+    // Auto-close: if ≥3 points and click is within 12px of the first point, close the polygon
+    if (points.value.length >= 3) {
+        const first = fracToPx(points.value[0]);
+        const cur   = fracToPx(frac);
+        const dist  = Math.hypot(cur.x - first.x, cur.y - first.y);
+        if (dist <= 12) {
+            closeAndFill();
+            return;
+        }
+    }
+
+    points.value.push(frac);
     redraw();
 }
 
+const nearFirstPoint = ref(false);
+
 function onMouseMove(e) {
     if (maskReady.value || points.value.length === 0) {
-        mouseFrac.value = null;
+        mouseFrac.value  = null;
+        nearFirstPoint.value = false;
         return;
     }
-    mouseFrac.value = eventToFrac(e, canvasRef.value);
+
+    const frac = eventToFrac(e, canvasRef.value);
+    mouseFrac.value = frac;
+
+    // Detect if cursor is close to the first point (for close-on-click feedback)
+    if (points.value.length >= 3) {
+        const first = fracToPx(points.value[0]);
+        const cur   = fracToPx(frac);
+        nearFirstPoint.value = Math.hypot(cur.x - first.x, cur.y - first.y) <= 12;
+    } else {
+        nearFirstPoint.value = false;
+    }
+
     redraw();
 }
 
@@ -306,12 +337,16 @@ function redraw() {
 
     ctx.setLineDash([]);
     px.forEach((p, i) => {
+        // First point enlarges when cursor is near (close-polygon hint)
+        const r = i === 0
+            ? (nearFirstPoint.value && px.length >= 3 ? 10 : 6)
+            : 4;
         ctx.beginPath();
-        ctx.arc(p.x, p.y, i === 0 ? 6 : 4, 0, Math.PI * 2);
+        ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
         ctx.fillStyle   = i === 0 ? '#10b981' : '#a78bfa';
         ctx.fill();
         ctx.strokeStyle = '#fff';
-        ctx.lineWidth   = 1;
+        ctx.lineWidth   = 1.5;
         ctx.stroke();
     });
 }
