@@ -324,25 +324,33 @@ async function saveMask() {
 async function savePolygonMask() {
     if (points.value.length < 3) return;
 
-    const natW = props.naturalWidth  || imgRef.value?.naturalWidth  || 1;
-    const natH = props.naturalHeight || imgRef.value?.naturalHeight || 1;
+    // Step 1: draw polygon in DISPLAY coords (same as redraw — guaranteed correct)
+    const c  = canvasRef.value;
+    const dw = c.width;
+    const dh = c.height;
 
-    // Mask is opaque-white polygon on TRANSPARENT background.
-    // destination-in in composeTextureWithMask uses ALPHA to clip:
-    //   alpha=255 (inside polygon) → keeps texture pixel
-    //   alpha=0   (outside)        → removes texture pixel
+    const tmp    = document.createElement('canvas');
+    tmp.width    = dw;
+    tmp.height   = dh;
+    const tmpCtx = tmp.getContext('2d');
+
+    const px = points.value.map(fracToPx);
+    tmpCtx.beginPath();
+    tmpCtx.moveTo(px[0].x, px[0].y);
+    px.slice(1).forEach(p => tmpCtx.lineTo(p.x, p.y));
+    tmpCtx.closePath();
+    tmpCtx.fillStyle = 'rgba(255,255,255,1)';
+    tmpCtx.fill();
+
+    // Step 2: scale up to natural (canvas_width × canvas_height).
+    // drawImage handles the proportional scaling; no manual math needed.
+    const natW = props.naturalWidth  || imgRef.value?.naturalWidth  || dw;
+    const natH = props.naturalHeight || imgRef.value?.naturalHeight || dh;
+
     const mc  = document.createElement('canvas');
     mc.width  = natW;
     mc.height = natH;
-    const ctx = mc.getContext('2d');
-
-    const nat = points.value.map(fracToNat);
-    ctx.beginPath();
-    ctx.moveTo(nat[0].x, nat[0].y);
-    nat.slice(1).forEach(p => ctx.lineTo(p.x, p.y));
-    ctx.closePath();
-    ctx.fillStyle = 'rgba(255,255,255,1)';
-    ctx.fill();
+    mc.getContext('2d').drawImage(tmp, 0, 0, natW, natH);
 
     await uploadAndEmit(mc.toDataURL('image/png'));
 }
