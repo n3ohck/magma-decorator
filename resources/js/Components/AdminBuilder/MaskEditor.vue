@@ -162,8 +162,11 @@ const emit = defineEmits(['mask-ready']); // { mask_path, mask_url, data_url }
 const activeTool    = ref('polygon');
 const imgRef        = ref(null);
 const canvasRef     = ref(null);
-const points        = ref([]);        // [{x,y}] in canvas pixels
-const mousePos      = ref(null);
+
+// Points stored as FRACTIONS (0-1) of the displayed canvas — immune to layout
+// changes, DPR differences, and CSS/pixel width mismatches.
+const points        = ref([]);  // [{ fx: 0-1, fy: 0-1 }]
+const mouseFrac     = ref(null);
 const maskReady     = ref(false);
 
 // SAM
@@ -176,58 +179,81 @@ const samMaskDataUrl = ref(null);
 const uploadState = ref('idle'); // idle | uploading | done | error
 const uploadError = ref('');
 
-// Canvas size (matches rendered img)
-const cw = ref(0);
-const ch = ref(0);
-
 // ── Canvas setup ──────────────────────────────────────────────────────────────
 
 function onImageLoad() {
     nextTick(syncCanvasSize);
 }
 
+// Keep canvas pixel resolution matching its CSS rendered size so that
+// the canvas coordinate space (0..width, 0..height) matches CSS pixels exactly.
 function syncCanvasSize() {
-    if (!imgRef.value || !canvasRef.value) return;
-    const r = imgRef.value.getBoundingClientRect();
-    cw.value = r.width;
-    ch.value = r.height;
-    canvasRef.value.width  = r.width;
-    canvasRef.value.height = r.height;
+    if (!canvasRef.value) return;
+    const r = canvasRef.value.getBoundingClientRect();
+    if (!r.width || !r.height) return;
+    canvasRef.value.width  = Math.round(r.width);
+    canvasRef.value.height = Math.round(r.height);
     redraw();
 }
 
 watch(activeTool, () => {
-    points.value  = [];
+    points.value    = [];
     maskReady.value = false;
     redraw();
 });
+
+// ── Coordinate helpers ────────────────────────────────────────────────────────
+
+// Convert a DOM event to fractions relative to the canvas element
+function eventToFrac(e, el) {
+    const r = el.getBoundingClientRect();
+    return {
+        fx: Math.max(0, Math.min(1, (e.clientX - r.left)  / r.width)),
+        fy: Math.max(0, Math.min(1, (e.clientY - r.top)   / r.height)),
+    };
+}
+
+// Convert fractions to canvas pixel coords (using current canvas dimensions)
+function fracToPx({ fx, fy }) {
+    const c = canvasRef.value;
+    return { x: fx * (c?.width ?? 1), y: fy * (c?.height ?? 1) };
+}
+
+// Convert fractions to natural image coords
+function fracToNat({ fx, fy }) {
+    const natW = props.naturalWidth  || imgRef.value?.naturalWidth  || 1;
+    const natH = props.naturalHeight || imgRef.value?.naturalHeight || 1;
+    return { x: fx * natW, y: fy * natH };
+}
 
 // ── Drawing ───────────────────────────────────────────────────────────────────
 
 function onCanvasClick(e) {
     if (maskReady.value) return;
-    const r = canvasRef.value.getBoundingClientRect();
-    points.value.push({ x: e.clientX - r.left, y: e.clientY - r.top });
+    syncCanvasSize(); // ensure canvas dimensions are current
+    points.value.push(eventToFrac(e, canvasRef.value));
     redraw();
 }
 
 function onMouseMove(e) {
     if (maskReady.value || points.value.length === 0) {
-        mousePos.value = null;
+        mouseFrac.value = null;
         return;
     }
-    const r = canvasRef.value.getBoundingClientRect();
-    mousePos.value = { x: e.clientX - r.left, y: e.clientY - r.top };
+    mouseFrac.value = eventToFrac(e, canvasRef.value);
     redraw();
 }
 
 function redraw() {
     const canvas = canvasRef.value;
-    if (!canvas) return;
+    if (!canvas || !canvas.width) return;
     const ctx = canvas.getContext('2d');
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     if (points.value.length === 0) return;
+
+    const px = points.value.map(fracToPx);
+    const mp = mouseFrac.value ? fracToPx(mouseFrac.value) : null;
 
     ctx.strokeStyle = '#a78bfa';
     ctx.fillStyle   = 'rgba(139, 92, 246, 0.25)';
@@ -235,12 +261,10 @@ function redraw() {
     ctx.setLineDash([6, 3]);
 
     ctx.beginPath();
-    ctx.moveTo(points.value[0].x, points.value[0].y);
-    points.value.slice(1).forEach(p => ctx.lineTo(p.x, p.y));
+    ctx.moveTo(px[0].x, px[0].y);
+    px.slice(1).forEach(p => ctx.lineTo(p.x, p.y));
 
-    if (mousePos.value && !maskReady.value) {
-        ctx.lineTo(mousePos.value.x, mousePos.value.y);
-    }
+    if (mp && !maskReady.value) ctx.lineTo(mp.x, mp.y);
 
     if (maskReady.value) {
         ctx.closePath();
@@ -252,15 +276,14 @@ function redraw() {
 
     ctx.stroke();
 
-    // Draw points
     ctx.setLineDash([]);
-    points.value.forEach((p, i) => {
+    px.forEach((p, i) => {
         ctx.beginPath();
         ctx.arc(p.x, p.y, i === 0 ? 6 : 4, 0, Math.PI * 2);
-        ctx.fillStyle = i === 0 ? '#10b981' : '#a78bfa';
+        ctx.fillStyle   = i === 0 ? '#10b981' : '#a78bfa';
         ctx.fill();
         ctx.strokeStyle = '#fff';
-        ctx.lineWidth = 1;
+        ctx.lineWidth   = 1;
         ctx.stroke();
     });
 }
@@ -273,15 +296,15 @@ function undoLastPoint() {
 
 function closeAndFill() {
     if (points.value.length < 3) return;
-    maskReady.value = true;
-    mousePos.value  = null;
+    maskReady.value  = true;
+    mouseFrac.value  = null;
     redraw();
 }
 
 function reset() {
     points.value         = [];
     maskReady.value      = false;
-    mousePos.value       = null;
+    mouseFrac.value      = null;
     samMaskDataUrl.value = null;
     samClickPos.value    = null;
     samError.value       = '';
@@ -294,40 +317,34 @@ function reset() {
 // ── Export polygon mask ───────────────────────────────────────────────────────
 
 async function saveMask() {
-    if (activeTool.value === 'polygon') {
-        await savePolygonMask();
-    } else if (samMaskDataUrl.value) {
-        await saveSamMask();
-    }
+    if (activeTool.value === 'polygon') await savePolygonMask();
+    else if (samMaskDataUrl.value)       await saveSamMask();
 }
 
 async function savePolygonMask() {
     if (points.value.length < 3) return;
 
-    // Use canvas_width/height (the virtual canvas the renderer uses)
-    // Prefer props (canvas_width/height) over actual image pixel dimensions
-    const natW  = props.naturalWidth  || imgRef.value?.naturalWidth  || cw.value;
-    const natH  = props.naturalHeight || imgRef.value?.naturalHeight || ch.value;
-    const scaleX = natW / cw.value;
-    const scaleY = natH / ch.value;
+    const natW = props.naturalWidth  || imgRef.value?.naturalWidth  || 1;
+    const natH = props.naturalHeight || imgRef.value?.naturalHeight || 1;
 
-    // CRITICAL: keep background TRANSPARENT (not black).
-    // composeTextureWithMask uses destination-in which clips based on ALPHA,
-    // not color — a black opaque background (alpha=255) would keep all texture pixels.
+    // Mask is opaque-white polygon on TRANSPARENT background.
+    // destination-in in composeTextureWithMask uses ALPHA to clip:
+    //   alpha=255 (inside polygon) → keeps texture pixel
+    //   alpha=0   (outside)        → removes texture pixel
     const mc  = document.createElement('canvas');
     mc.width  = natW;
     mc.height = natH;
     const ctx = mc.getContext('2d');
 
+    const nat = points.value.map(fracToNat);
     ctx.beginPath();
-    ctx.moveTo(points.value[0].x * scaleX, points.value[0].y * scaleY);
-    points.value.slice(1).forEach(p => ctx.lineTo(p.x * scaleX, p.y * scaleY));
+    ctx.moveTo(nat[0].x, nat[0].y);
+    nat.slice(1).forEach(p => ctx.lineTo(p.x, p.y));
     ctx.closePath();
-    ctx.fillStyle = 'rgba(255, 255, 255, 1)'; // opaque white on transparent background
+    ctx.fillStyle = 'rgba(255,255,255,1)';
     ctx.fill();
 
-    const dataUrl = mc.toDataURL('image/png');
-    await uploadAndEmit(dataUrl);
+    await uploadAndEmit(mc.toDataURL('image/png'));
 }
 
 async function saveSamMask() {
