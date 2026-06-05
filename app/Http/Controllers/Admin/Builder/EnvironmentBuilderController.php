@@ -87,16 +87,16 @@ class EnvironmentBuilderController extends Controller
             'slug' => ['nullable', 'string', 'max:255', 'unique:environments,slug,' . $id],
             'type' => ['nullable', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
-            'base_image' => [$id ? 'nullable' : 'required', 'image', 'max:20480'],
-            'preview_image' => ['nullable', 'image', 'max:20480'],
-            'shadow_overlay_image' => ['nullable', 'image', 'max:20480'],
-            'light_overlay_image' => ['nullable', 'image', 'max:20480'],
+            'base_image' => [$id ? 'nullable' : 'required', 'image', 'max:51200'],
+            'preview_image' => ['nullable', 'image', 'max:51200'],
+            'shadow_overlay_image' => ['nullable', 'image', 'max:51200'],
+            'light_overlay_image' => ['nullable', 'image', 'max:51200'],
             'canvas_width' => ['nullable', 'integer', 'min:100'],
             'canvas_height' => ['nullable', 'integer', 'min:100'],
             'is_featured' => ['nullable', 'boolean'],
             'is_active' => ['nullable', 'boolean'],
             'sort_order' => ['nullable', 'integer', 'min:0'],
-            'foreground_overlay_image' => ['nullable', 'image', 'max:20480'],
+            'foreground_overlay_image' => ['nullable', 'image', 'max:51200'],
         ]);
     }
 
