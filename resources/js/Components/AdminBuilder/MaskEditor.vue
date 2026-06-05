@@ -127,11 +127,21 @@
         <button
             v-if="maskReady || samMaskDataUrl"
             type="button"
-            class="w-full py-2.5 rounded-xl bg-violet-500 hover:bg-violet-400 text-white text-sm font-semibold transition"
+            class="w-full py-2.5 rounded-xl text-sm font-semibold transition flex items-center justify-center gap-2"
+            :class="uploadState === 'done'
+                ? 'bg-emerald-500 text-white cursor-default'
+                : 'bg-violet-500 hover:bg-violet-400 text-white'"
+            :disabled="uploadState === 'uploading'"
             @click="saveMask"
         >
-            Usar esta máscara
+            <span v-if="uploadState === 'uploading'" class="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+            {{ uploadState === 'uploading' ? 'Guardando…' : uploadState === 'done' ? '✓ Máscara guardada' : 'Usar esta máscara' }}
         </button>
+
+        <!-- Upload error -->
+        <div v-if="uploadState === 'error'" class="rounded-lg bg-red-500/20 border border-red-500/30 px-3 py-2 text-xs text-red-300">
+            {{ uploadError }}
+        </div>
     </div>
 </template>
 
@@ -157,10 +167,14 @@ const mousePos      = ref(null);
 const maskReady     = ref(false);
 
 // SAM
-const samLoading    = ref(false);
-const samError      = ref('');
-const samClickPos   = ref(null);      // {x,y} as 0-1 fractions
+const samLoading     = ref(false);
+const samError       = ref('');
+const samClickPos    = ref(null);
 const samMaskDataUrl = ref(null);
+
+// Upload state
+const uploadState = ref('idle'); // idle | uploading | done | error
+const uploadError = ref('');
 
 // Canvas size (matches rendered img)
 const cw = ref(0);
@@ -265,12 +279,14 @@ function closeAndFill() {
 }
 
 function reset() {
-    points.value     = [];
-    maskReady.value  = false;
-    mousePos.value   = null;
+    points.value         = [];
+    maskReady.value      = false;
+    mousePos.value       = null;
     samMaskDataUrl.value = null;
     samClickPos.value    = null;
     samError.value       = '';
+    uploadState.value    = 'idle';
+    uploadError.value    = '';
     const canvas = canvasRef.value;
     if (canvas) canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
 }
@@ -288,26 +304,26 @@ async function saveMask() {
 async function savePolygonMask() {
     if (points.value.length < 3) return;
 
-    // Natural dimensions for full-res mask
-    const natW = props.naturalWidth  || imgRef.value?.naturalWidth  || cw.value;
-    const natH = props.naturalHeight || imgRef.value?.naturalHeight || ch.value;
+    // Use canvas_width/height (the virtual canvas the renderer uses)
+    // Prefer props (canvas_width/height) over actual image pixel dimensions
+    const natW  = props.naturalWidth  || imgRef.value?.naturalWidth  || cw.value;
+    const natH  = props.naturalHeight || imgRef.value?.naturalHeight || ch.value;
     const scaleX = natW / cw.value;
     const scaleY = natH / ch.value;
 
-    // Create full-res mask canvas (white polygon on black)
+    // CRITICAL: keep background TRANSPARENT (not black).
+    // composeTextureWithMask uses destination-in which clips based on ALPHA,
+    // not color — a black opaque background (alpha=255) would keep all texture pixels.
     const mc  = document.createElement('canvas');
     mc.width  = natW;
     mc.height = natH;
     const ctx = mc.getContext('2d');
 
-    ctx.fillStyle = '#000';
-    ctx.fillRect(0, 0, natW, natH);
-
     ctx.beginPath();
     ctx.moveTo(points.value[0].x * scaleX, points.value[0].y * scaleY);
     points.value.slice(1).forEach(p => ctx.lineTo(p.x * scaleX, p.y * scaleY));
     ctx.closePath();
-    ctx.fillStyle = '#fff';
+    ctx.fillStyle = 'rgba(255, 255, 255, 1)'; // opaque white on transparent background
     ctx.fill();
 
     const dataUrl = mc.toDataURL('image/png');
@@ -319,17 +335,29 @@ async function saveSamMask() {
 }
 
 async function uploadAndEmit(dataUrl) {
+    uploadState.value = 'uploading';
+    uploadError.value = '';
+
     try {
+        const csrf = document.querySelector('meta[name="csrf-token"]')?.content;
         const { data } = await axios.post('/admin/builder/mask-upload', {
             mask_data: dataUrl,
+        }, {
+            headers: csrf ? { 'X-CSRF-TOKEN': csrf } : {},
         });
+
+        uploadState.value = 'done';
         emit('mask-ready', {
             mask_path: data.mask_path,
             mask_url:  data.mask_url,
             data_url:  dataUrl,
         });
     } catch (e) {
-        console.error('Error guardando máscara', e);
+        uploadState.value = 'error';
+        uploadError.value = e?.response?.data?.error
+            ?? e?.response?.data?.message
+            ?? `Error ${e?.response?.status ?? ''}: No se pudo guardar la máscara.`;
+        console.error('MaskEditor upload error', e);
     }
 }
 
