@@ -97,15 +97,23 @@ class SAMMaskController extends Controller
         if (is_string($output) && str_starts_with($output, 'http')) {
             $maskUrl = $output;
         } elseif (is_array($output)) {
-            // Array directo de URLs
-            if (isset($output[0]) && is_string($output[0])) {
+            // {"combined_mask": "...", "individual_masks": [...]}
+            if (isset($output['combined_mask'])) {
+                $maskUrl = $output['combined_mask'];
+            }
+            // {"individual_masks": [...]}
+            elseif (isset($output['individual_masks'][0])) {
+                $maskUrl = $output['individual_masks'][0];
+            }
+            // Array directo de URLs: ["https://..."]
+            elseif (isset($output[0]) && is_string($output[0])) {
                 $maskUrl = $output[0];
             }
-            // Objeto con clave 'masks'
+            // {"masks": [...]}
             elseif (isset($output['masks'][0])) {
                 $maskUrl = $output['masks'][0];
             }
-            // Objeto con clave 'mask'
+            // {"mask": "..."}
             elseif (isset($output['mask']) && is_string($output['mask'])) {
                 $maskUrl = $output['mask'];
             }
