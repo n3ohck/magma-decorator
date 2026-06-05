@@ -48,13 +48,13 @@ class MaterialCategoryBuilderController extends Controller
         if ($request->boolean('remove_cover_image')) {
             $this->deleteFile($materialCategory->cover_image);
             $data['cover_image'] = null;
-        }
-
-        if ($request->hasFile('cover_image')) {
+        } elseif ($request->hasFile('cover_image')) {
             $this->deleteFile($materialCategory->cover_image);
             $data['cover_image'] = $optimizer->store(
                 $request->file('cover_image'), 'material-categories', 'preview'
             );
+        } else {
+            unset($data['cover_image']);
         }
 
         if (empty($data['slug'])) {

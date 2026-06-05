@@ -56,11 +56,11 @@ class EnvironmentBuilderController extends Controller
             if ($request->boolean($removeField)) {
                 $this->deleteFile($environment->{$field});
                 $data[$field] = null;
-            }
-
-            if ($request->hasFile($field)) {
+            } elseif ($request->hasFile($field)) {
                 $this->deleteFile($environment->{$field});
                 $data[$field] = $optimizer->store($request->file($field), $folder, $profile);
+            } else {
+                unset($data[$field]);
             }
         }
 

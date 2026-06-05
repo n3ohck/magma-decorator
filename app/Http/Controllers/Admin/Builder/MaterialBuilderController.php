@@ -65,25 +65,26 @@ class MaterialBuilderController extends Controller
         if ($request->boolean('remove_texture_image')) {
             $this->deleteFile($material->texture_image);
             $data['texture_image'] = null;
+        } elseif ($request->hasFile('texture_image')) {
+            $this->deleteFile($material->texture_image);
+            $data['texture_image'] = $optimizer->store(
+                $request->file('texture_image'), 'materials/textures', 'texture'
+            );
+        } else {
+            // No change — remove from update array to keep the existing value
+            unset($data['texture_image']);
         }
 
         if ($request->boolean('remove_thumbnail_image')) {
             $this->deleteFile($material->thumbnail_image);
             $data['thumbnail_image'] = null;
-        }
-
-        if ($request->hasFile('texture_image')) {
-            $this->deleteFile($material->texture_image);
-            $data['texture_image'] = $optimizer->store(
-                $request->file('texture_image'), 'materials/textures', 'texture'
-            );
-        }
-
-        if ($request->hasFile('thumbnail_image')) {
+        } elseif ($request->hasFile('thumbnail_image')) {
             $this->deleteFile($material->thumbnail_image);
             $data['thumbnail_image'] = $optimizer->store(
                 $request->file('thumbnail_image'), 'materials/thumbnails', 'thumbnail'
             );
+        } else {
+            unset($data['thumbnail_image']);
         }
 
         $material->update($data);
