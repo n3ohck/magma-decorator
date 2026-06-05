@@ -7,6 +7,7 @@ use App\Services\ReplicateService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
@@ -41,21 +42,44 @@ class SAMMaskController extends Controller
         $pixelX = (int) round($data['x'] * $data['image_width']);
         $pixelY = (int) round($data['y'] * $data['image_height']);
 
+        // Resize la imagen a max 1024px para reducir el payload y evitar timeouts
+        $imageData = $this->resizeBase64Image($data['image_data'], 1024);
+
         // Versión de SAM 2 en Replicate
         $version = config(
             'services.replicate.sam_version',
             'fe97b453a6455861e3bac769b441ca1f1086110da7466dbb65cf1eecfd60dc83'
         );
 
+        // Escalar coordenadas si la imagen fue redimensionada
+        $scaledW = $data['image_width'];
+        $scaledH = $data['image_height'];
+        $maxSide = 1024;
+        if ($scaledW > $maxSide || $scaledH > $maxSide) {
+            $ratio   = min($maxSide / $scaledW, $maxSide / $scaledH);
+            $scaledW = (int) round($scaledW * $ratio);
+            $scaledH = (int) round($scaledH * $ratio);
+            $pixelX  = (int) round($data['x'] * $scaledW);
+            $pixelY  = (int) round($data['y'] * $scaledH);
+        }
+
         $prediction = $replicate->createPrediction($version, [
-            'image'            => $data['image_data'],  // base64 — no necesita URL pública
+            'image'            => $imageData,
             'input_points'     => [[$pixelX, $pixelY]],
             'input_labels'     => [1],
             'multimask_output' => false,
         ]);
 
-        // SAM is fast — wait synchronously (timeout 60s)
-        $result = $replicate->waitForResult($prediction['id'], maxSeconds: 60);
+        // SAM is fast — wait synchronously (timeout 90s)
+        $result = $replicate->waitForResult($prediction['id'], maxSeconds: 90);
+
+        // Log completo para diagnóstico
+        Log::info('SAM prediction result', [
+            'id'     => $prediction['id'],
+            'status' => $result['status'],
+            'output' => $result['output'] ?? null,
+            'error'  => $result['error'] ?? null,
+        ]);
 
         if ($result['status'] !== 'succeeded') {
             return response()->json([
@@ -63,12 +87,35 @@ class SAMMaskController extends Controller
             ], 500);
         }
 
-        // The output is a mask image URL (PNG with white = segment, black = background)
+        // SAM 2 puede devolver el output en varios formatos:
+        //   - array de URLs: ["https://...mask.png"]
+        //   - objeto con clave masks: {"masks": ["https://...mask.png"]}
+        //   - string URL directa: "https://...mask.png"
         $output  = $result['output'];
-        $maskUrl = is_array($output) ? ($output[0] ?? null) : $output;
+        $maskUrl = null;
+
+        if (is_string($output) && str_starts_with($output, 'http')) {
+            $maskUrl = $output;
+        } elseif (is_array($output)) {
+            // Array directo de URLs
+            if (isset($output[0]) && is_string($output[0])) {
+                $maskUrl = $output[0];
+            }
+            // Objeto con clave 'masks'
+            elseif (isset($output['masks'][0])) {
+                $maskUrl = $output['masks'][0];
+            }
+            // Objeto con clave 'mask'
+            elseif (isset($output['mask']) && is_string($output['mask'])) {
+                $maskUrl = $output['mask'];
+            }
+        }
 
         if (! $maskUrl) {
-            return response()->json(['error' => 'SAM no devolvió una imagen de máscara.'], 500);
+            Log::warning('SAM output format inesperado', ['output' => $output]);
+            return response()->json([
+                'error' => 'SAM no devolvió una imagen de máscara. Output: ' . json_encode($output),
+            ], 500);
         }
 
         // Download and persist the mask
@@ -115,5 +162,46 @@ class SAMMaskController extends Controller
             'mask_path' => $filename,
             'mask_url'  => Storage::disk('public')->url($filename),
         ]);
+    }
+
+    /**
+     * Redimensiona una imagen base64 al tamaño máximo indicado (mantiene ratio).
+     * Reduce el payload enviado a Replicate y evita timeouts.
+     */
+    private function resizeBase64Image(string $dataUrl, int $maxSide): string
+    {
+        try {
+            $base64 = substr($dataUrl, strpos($dataUrl, ',') + 1);
+            $binary = base64_decode($base64);
+
+            $src = imagecreatefromstring($binary);
+            if (! $src) return $dataUrl;
+
+            $w = imagesx($src);
+            $h = imagesy($src);
+
+            if ($w <= $maxSide && $h <= $maxSide) {
+                imagedestroy($src);
+                return $dataUrl;
+            }
+
+            $ratio = min($maxSide / $w, $maxSide / $h);
+            $nw    = (int) round($w * $ratio);
+            $nh    = (int) round($h * $ratio);
+
+            $dst = imagecreatetruecolor($nw, $nh);
+            imagecopyresampled($dst, $src, 0, 0, 0, 0, $nw, $nh, $w, $h);
+
+            ob_start();
+            imagejpeg($dst, null, 85);
+            $resized = ob_get_clean();
+
+            imagedestroy($src);
+            imagedestroy($dst);
+
+            return 'data:image/jpeg;base64,' . base64_encode($resized);
+        } catch (\Throwable) {
+            return $dataUrl; // fallback: original
+        }
     }
 }
