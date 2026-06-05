@@ -95,7 +95,15 @@ class EnvironmentZoneBuilderController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'slug' => ['nullable', 'string', 'max:255'],
             'zone_type' => ['nullable', 'string', 'max:255'],
-            'mask_image' => [$id ? 'nullable' : 'required', 'image', 'max:51200'],
+            // Requerido al crear solo si no se proporciona una máscara vía sam_mask_path
+            'mask_image' => [
+                $id
+                    ? 'nullable'
+                    : \Illuminate\Validation\Rule::requiredIf(fn () => ! $request->filled('sam_mask_path')),
+                'nullable',
+                'image',
+                'max:51200',
+            ],
             'default_texture_scale' => ['nullable', 'numeric', 'min:0.1'],
             'default_texture_rotation' => ['nullable', 'numeric'],
             'default_opacity' => ['nullable', 'numeric', 'min:0', 'max:1'],
