@@ -87,6 +87,8 @@ class EnvironmentBuilderController extends Controller
             'slug' => ['nullable', 'string', 'max:255', 'unique:environments,slug,' . $id],
             'type' => ['nullable', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
+            'keywords'    => ['nullable', 'array'],
+            'keywords.*'  => ['string', 'max:100'],
             'base_image' => [$id ? 'nullable' : 'required', 'image', 'max:51200'],
             'preview_image' => ['nullable', 'image', 'max:51200'],
             'shadow_overlay_image' => ['nullable', 'image', 'max:51200'],

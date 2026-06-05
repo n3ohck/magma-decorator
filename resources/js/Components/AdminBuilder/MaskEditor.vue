@@ -13,6 +13,8 @@
                 ✦ Polígono
             </button>
 
+            <!-- SAM (IA) oculto temporalmente -->
+            <!--
             <button
                 type="button"
                 class="px-3 py-1.5 text-xs font-semibold rounded-lg transition"
@@ -23,6 +25,7 @@
             >
                 🤖 SAM (IA)
             </button>
+            -->
 
             <div class="flex-1" />
 

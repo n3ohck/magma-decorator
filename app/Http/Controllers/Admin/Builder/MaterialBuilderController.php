@@ -114,6 +114,8 @@ class MaterialBuilderController extends Controller
             'base_color' => ['nullable', 'string', 'max:255'],
             'short_description' => ['nullable', 'string'],
             'description' => ['nullable', 'string'],
+            'keywords'    => ['nullable', 'array'],
+            'keywords.*'  => ['string', 'max:100'],
             'texture_image' => [$id ? 'nullable' : 'required', 'image', 'max:51200'],
             'thumbnail_image' => ['nullable', 'image', 'max:51200'],
             'default_scale' => ['nullable', 'numeric', 'min:0.1'],

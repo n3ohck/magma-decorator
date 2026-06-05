@@ -186,6 +186,11 @@
                         ></textarea>
                     </div>
 
+                    <div class="md:col-span-2">
+                        <label class="label">Keywords / Tags</label>
+                        <TagInput v-model="form.keywords" placeholder="Agregar keyword…" />
+                    </div>
+
                     <ImageUploader
                         label="Imagen base del ambiente"
                         v-model="form.base_image"
@@ -254,6 +259,7 @@ import { ref } from 'vue';
 import { router, useForm } from '@inertiajs/vue3';
 import BuilderLayout from '@/Components/AdminBuilder/BuilderLayout.vue';
 import ImageUploader from '@/Components/AdminBuilder/ImageUploader.vue';
+import TagInput from '@/Components/AdminBuilder/TagInput.vue';
 
 defineProps({
     items: {
@@ -287,6 +293,7 @@ const form = useForm({
     slug: '',
     type: '',
     description: '',
+    keywords: [],
     base_image: null,
     preview_image: null,
     shadow_overlay_image: null,
@@ -312,6 +319,7 @@ function resetForm() {
     form.slug = '';
     form.type = '';
     form.description = '';
+    form.keywords = [];
     form.base_image = null;
     form.preview_image = null;
     form.shadow_overlay_image = null;
@@ -345,6 +353,7 @@ function openEdit(item) {
     form.slug = item.slug || '';
     form.type = item.type || '';
     form.description = item.description || '';
+    form.keywords = item.keywords ?? [];
     form.canvas_width = item.canvas_width || 1600;
     form.canvas_height = item.canvas_height || 1000;
     form.is_featured = Boolean(item.is_featured);

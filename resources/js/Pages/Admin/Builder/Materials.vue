@@ -105,6 +105,11 @@
                         <textarea v-model="form.short_description" class="input min-h-24"></textarea>
                     </div>
 
+                    <div class="md:col-span-2">
+                        <label class="label">Keywords / Tags</label>
+                        <TagInput v-model="form.keywords" placeholder="Agregar keyword…" />
+                    </div>
+
                     <ImageUploader
                         label="Textura"
                         v-model="form.texture_image"
@@ -153,6 +158,7 @@ import { ref } from 'vue';
 import { router, useForm } from '@inertiajs/vue3';
 import BuilderLayout from '@/Components/AdminBuilder/BuilderLayout.vue';
 import ImageUploader from '@/Components/AdminBuilder/ImageUploader.vue';
+import TagInput from '@/Components/AdminBuilder/TagInput.vue';
 
 const props = defineProps({
     items: Array,
@@ -191,6 +197,7 @@ const form = useForm({
     base_color: '',
     short_description: '',
     description: '',
+    keywords: [],
     texture_image: null,
     thumbnail_image: null,
     remove_texture_image: false,
@@ -229,6 +236,7 @@ function openEdit(item) {
         finish: item.finish,
         base_color: item.base_color,
         short_description: item.short_description,
+        keywords: item.keywords ?? [],
         description: item.description,
         default_scale: item.default_scale || 1,
         default_rotation: item.default_rotation || 0,

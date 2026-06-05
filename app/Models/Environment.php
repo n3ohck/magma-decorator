@@ -14,6 +14,7 @@ class Environment extends Model
         'slug',
         'type',
         'description',
+        'keywords',
         'base_image',
         'preview_image',
         'shadow_overlay_image',
@@ -27,6 +28,7 @@ class Environment extends Model
     ];
 
     protected $casts = [
+        'keywords'    => 'array',
         'is_featured' => 'boolean',
         'is_active' => 'boolean',
         'sort_order' => 'integer',

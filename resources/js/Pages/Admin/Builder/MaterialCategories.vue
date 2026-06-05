@@ -122,6 +122,11 @@
                         <textarea v-model="form.description" class="input min-h-28"></textarea>
                     </div>
 
+                    <div class="md:col-span-2">
+                        <label class="block text-sm font-semibold text-white/80 mb-2">Keywords / Tags</label>
+                        <TagInput v-model="form.keywords" placeholder="Agregar keyword…" />
+                    </div>
+
                     <ImageUploader
                         label="Imagen de portada"
                         v-model="form.cover_image"
@@ -157,6 +162,7 @@ import { ref } from 'vue';
 import { router, useForm } from '@inertiajs/vue3';
 import BuilderLayout from '@/Components/AdminBuilder/BuilderLayout.vue';
 import ImageUploader from '@/Components/AdminBuilder/ImageUploader.vue';
+import TagInput from '@/Components/AdminBuilder/TagInput.vue';
 
 defineProps({
     items: {
@@ -189,6 +195,7 @@ const form = useForm({
     name: '',
     slug: '',
     description: '',
+    keywords: [],
     cover_image: null,
     remove_cover_image: false,
     is_active: true,
@@ -202,6 +209,7 @@ function resetForm() {
     form.name = '';
     form.slug = '';
     form.description = '';
+    form.keywords = [];
     form.cover_image = null;
     form.remove_cover_image = false;
     form.is_active = true;
@@ -223,6 +231,7 @@ function openEdit(item) {
     form.name = item.name;
     form.slug = item.slug;
     form.description = item.description;
+    form.keywords = item.keywords ?? [];
     form.is_active = Boolean(item.is_active);
     form.sort_order = item.sort_order || 0;
 

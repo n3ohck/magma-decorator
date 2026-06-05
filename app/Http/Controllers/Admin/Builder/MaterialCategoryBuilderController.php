@@ -81,6 +81,8 @@ class MaterialCategoryBuilderController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'slug' => ['nullable', 'string', 'max:255', 'unique:material_categories,slug,' . $id],
             'description' => ['nullable', 'string'],
+            'keywords'    => ['nullable', 'array'],
+            'keywords.*'  => ['string', 'max:100'],
             'cover_image' => ['nullable', 'image', 'max:51200'],
             'is_active' => ['nullable', 'boolean'],
             'sort_order' => ['nullable', 'integer', 'min:0'],
