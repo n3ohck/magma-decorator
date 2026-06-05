@@ -4,119 +4,97 @@ namespace App\Services;
 
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
+use Intervention\Image\Drivers\Gd\Driver as GdDriver;
 use Intervention\Image\Drivers\Imagick\Driver as ImagickDriver;
 use Intervention\Image\ImageManager;
 
 /**
- * Optimiza imágenes antes de guardarlas en storage.
+ * Optimiza imágenes antes de guardarlas.
  *
- * Estrategia por tipo:
- *  - texture   → PNG, max 1200×1200, compresión máxima, preserva alpha
- *  - thumbnail → WebP, max 600×600,  calidad 82 %
- *  - base      → WebP, max 2400 px ancho, calidad 85 %
- *  - overlay   → PNG, max 2400 px ancho, lossless (requiere alpha exacto)
- *  - mask      → PNG, max 2400 px ancho, lossless (alpha binario crítico)
- *  - preview   → WebP, max 1200 px ancho, calidad 80 %
- *  - default   → WebP, max 1800 px ancho, calidad 82 %
+ * Perfil    | Formato | Máx px       | Notas
+ * --------- | ------- | ------------ | -----------------------------------
+ * texture   | WebP 88 | 1400 × 1400  | Alpha soportado, ~80% menos que PNG
+ * thumbnail | WebP 80 | 600  × 600   | Miniatura del material
+ * base      | WebP 85 | 2400 × 2400  | Imagen base del ambiente
+ * overlay   | WebP 90 | 2400 × 2400  | Sombra / luz / foreground (alpha)
+ * mask      | WebP 100| 2400 × 2400  | Alpha exacto, lossless via calidad 100
+ * preview   | WebP 80 | 1200 × 1200  | Preview card del ambiente
+ * default   | WebP 82 | 1800 × 1800  | Cualquier otra imagen
  */
 class ImageOptimizer
 {
     private const PROFILES = [
-        'texture'   => ['format' => 'png',  'max_w' => 1200, 'max_h' => 1200, 'quality' => 9,   'lossless' => true],
-        'thumbnail' => ['format' => 'webp', 'max_w' => 600,  'max_h' => 600,  'quality' => 82,  'lossless' => false],
-        'base'      => ['format' => 'webp', 'max_w' => 2400, 'max_h' => 2400, 'quality' => 85,  'lossless' => false],
-        'overlay'   => ['format' => 'png',  'max_w' => 2400, 'max_h' => 2400, 'quality' => 9,   'lossless' => true],
-        'mask'      => ['format' => 'png',  'max_w' => 2400, 'max_h' => 2400, 'quality' => 9,   'lossless' => true],
-        'preview'   => ['format' => 'webp', 'max_w' => 1200, 'max_h' => 1200, 'quality' => 80,  'lossless' => false],
-        'default'   => ['format' => 'webp', 'max_w' => 1800, 'max_h' => 1800, 'quality' => 82,  'lossless' => false],
+        'texture'   => ['max_w' => 1400, 'max_h' => 1400, 'quality' => 88],
+        'thumbnail' => ['max_w' => 600,  'max_h' => 600,  'quality' => 80],
+        'base'      => ['max_w' => 2400, 'max_h' => 2400, 'quality' => 85],
+        'overlay'   => ['max_w' => 2400, 'max_h' => 2400, 'quality' => 90],
+        'mask'      => ['max_w' => 2400, 'max_h' => 2400, 'quality' => 100],
+        'preview'   => ['max_w' => 1200, 'max_h' => 1200, 'quality' => 80],
+        'default'   => ['max_w' => 1800, 'max_h' => 1800, 'quality' => 82],
     ];
 
     private ImageManager $manager;
 
     public function __construct()
     {
-        $this->manager = new ImageManager(new ImagickDriver());
+        // Usa Imagick si está disponible; si no, GD como fallback
+        $this->manager = extension_loaded('imagick')
+            ? new ImageManager(new ImagickDriver())
+            : new ImageManager(new GdDriver());
     }
 
     /**
-     * Optimiza un UploadedFile y devuelve el contenido binario listo para Storage::put().
-     *
-     * @param  UploadedFile  $file
-     * @param  string        $profile  Uno de: texture, thumbnail, base, overlay, mask, preview, default
-     * @return array{content: string, extension: string, mime: string}
+     * Optimiza y guarda en Storage::disk('public').
+     * Devuelve la ruta relativa guardada (siempre .webp).
      */
-    public function optimize(UploadedFile $file, string $profile = 'default'): array
+    public function store(UploadedFile $file, string $folder, string $profile = 'default'): string
     {
-        $cfg = self::PROFILES[$profile] ?? self::PROFILES['default'];
+        $cfg      = self::PROFILES[$profile] ?? self::PROFILES['default'];
+        $before   = $file->getSize();
+        $original = $file->getClientOriginalName();
 
         try {
             $image = $this->manager->read($file->getPathname());
 
-            // Escalar solo si excede las dimensiones máximas (nunca amplía)
+            // Escala solo si excede el máximo (nunca amplía)
             $image->scaleDown($cfg['max_w'], $cfg['max_h']);
 
-            // Codificar al formato objetivo
-            $encoded = match ($cfg['format']) {
-                'webp' => $image->toWebp($cfg['quality']),
-                'png'  => $image->toPng(indexed: false),     // PNG-24 comprimido
-                'jpeg' => $image->toJpeg($cfg['quality']),
-                default => $image->toWebp($cfg['quality']),
-            };
-
-            $mime = match ($cfg['format']) {
-                'webp'  => 'image/webp',
-                'png'   => 'image/png',
-                'jpeg'  => 'image/jpeg',
-                default => 'image/webp',
-            };
-
-            return [
-                'content'   => (string) $encoded,
-                'extension' => $cfg['format'] === 'jpeg' ? 'jpg' : $cfg['format'],
-                'mime'      => $mime,
-                'original'  => $file->getClientOriginalName(),
-            ];
+            // Todo sale como WebP — soporta alpha, mejor compresión que PNG/JPEG
+            $encoded = $image->toWebp($cfg['quality']);
+            $content = (string) $encoded;
 
         } catch (\Throwable $e) {
-            // Fallback: si falla la optimización, devuelve el archivo original sin tocar
-            Log::warning("ImageOptimizer: falló optimización, usando original. {$e->getMessage()}", [
-                'file'    => $file->getClientOriginalName(),
-                'profile' => $profile,
-            ]);
+            // Fallback: guardar original sin optimizar
+            Log::warning("ImageOptimizer fallback para '{$original}': {$e->getMessage()}");
+            $content = file_get_contents($file->getPathname());
 
-            return [
-                'content'   => file_get_contents($file->getPathname()),
-                'extension' => $file->getClientOriginalExtension() ?: 'png',
-                'mime'      => $file->getMimeType() ?: 'image/png',
-                'original'  => $file->getClientOriginalName(),
-            ];
+            // Guardar con extensión original
+            $ext  = strtolower($file->getClientOriginalExtension() ?: 'png');
+            $path = trim($folder, '/') . '/' . Str::uuid() . '.' . $ext;
+            Storage::disk('public')->put($path, $content);
+
+            Log::info("ImageOptimizer: guardado sin optimizar → {$path}");
+            return $path;
         }
-    }
 
-    /**
-     * Optimiza y guarda directamente en Storage::disk('public').
-     * Devuelve la ruta relativa guardada (incluyendo la nueva extensión).
-     *
-     * @param  UploadedFile  $file
-     * @param  string        $folder   Ejemplo: 'materials/textures'
-     * @param  string        $profile
-     * @return string  Ruta relativa, ej: 'materials/textures/abc123.webp'
-     */
-    public function store(UploadedFile $file, string $folder, string $profile = 'default'): string
-    {
-        $result    = $this->optimize($file, $profile);
-        $filename  = \Illuminate\Support\Str::uuid() . '.' . $result['extension'];
-        $path      = trim($folder, '/') . '/' . $filename;
+        $path  = trim($folder, '/') . '/' . Str::uuid() . '.webp';
+        Storage::disk('public')->put($path, $content);
 
-        \Illuminate\Support\Facades\Storage::disk('public')->put($path, $result['content']);
+        $after = strlen($content);
+        $pct   = $before > 0 ? round((1 - $after / $before) * 100, 1) : 0;
+        $driver = extension_loaded('imagick') ? 'Imagick' : 'GD';
 
-        $original  = $file->getClientOriginalName();
-        $before    = $file->getSize();
-        $after     = strlen($result['content']);
-        $saved     = $before > 0 ? round((1 - $after / $before) * 100, 1) : 0;
-
-        Log::info("ImageOptimizer: {$original} → {$path} ({$saved}% reducción, {$before}→{$after} bytes)");
+        Log::info("ImageOptimizer [{$driver}] {$original} → {$path} | {$this->humanSize($before)} → {$this->humanSize($after)} ({$pct}% reducción)");
 
         return $path;
+    }
+
+    private function humanSize(int $bytes): string
+    {
+        if ($bytes >= 1048576) return round($bytes / 1048576, 1) . ' MB';
+        if ($bytes >= 1024)    return round($bytes / 1024, 1) . ' KB';
+        return $bytes . ' B';
     }
 }

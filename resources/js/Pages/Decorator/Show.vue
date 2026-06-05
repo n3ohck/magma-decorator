@@ -196,8 +196,12 @@
                             Sin material en esta zona.
                         </p>
 
-                        <!-- Sliders -->
-                        <div v-if="currentZoneMaterial" class="mt-4 space-y-4 pt-4 border-t border-white/8">
+                        <!-- Sliders — key por zona+material fuerza re-mount al cambiar selección -->
+                        <div
+                            v-if="currentZoneMaterial"
+                            :key="`${selectedZone?.id}-${currentZoneMaterial?.material?.id}`"
+                            class="mt-4 space-y-4 pt-4 border-t border-white/8"
+                        >
                             <div>
                                 <div class="flex items-center justify-between mb-1.5">
                                     <span class="text-[10px] uppercase tracking-[0.2em] text-white/40">Escala</span>

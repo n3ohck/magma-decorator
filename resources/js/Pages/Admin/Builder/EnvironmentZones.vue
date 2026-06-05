@@ -325,23 +325,6 @@
                         </div>
                     </div>
 
-                    <div class="md:col-span-2">
-                        <label class="label">Puntos del polígono</label>
-                        <textarea
-                            v-model="form.polygon_points"
-                            class="input min-h-24"
-                            placeholder="Reservado para fase posterior"
-                        ></textarea>
-                    </div>
-
-                    <div class="md:col-span-2">
-                        <label class="label">Puntos de perspectiva</label>
-                        <textarea
-                            v-model="form.perspective_points"
-                            class="input min-h-24"
-                            placeholder="Reservado para fase posterior"
-                        ></textarea>
-                    </div>
 
                     <label class="flex items-center gap-3">
                         <input v-model="form.is_active" type="checkbox" class="h-5 w-5" />
