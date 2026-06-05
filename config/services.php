@@ -35,6 +35,11 @@ return [
         ],
     ],
 
+    'wordpress_sso' => [
+        // Mismo valor que MAGMA_SSO_SECRET en el plugin de WordPress
+        'secret' => env('WORDPRESS_SSO_SECRET'),
+    ],
+
     'replicate' => [
         'token'       => env('REPLICATE_API_TOKEN'),
         // SDXL img2img — para el render fotorrealista final

@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AIRenderController;
+use App\Http\Controllers\WordPressAuthController;
 use App\Http\Controllers\Admin\SAMMaskController;
 use App\Http\Controllers\DecoratorController;
 use App\Http\Controllers\DesignLeadController;
@@ -9,6 +10,10 @@ use Illuminate\Support\Facades\Route;
 Route::get('/', function () {
     return redirect()->route('decorator.index');
 });
+
+// WordPress SSO — token firmado desde el plugin WP
+Route::get('/admin/auth/wordpress', [WordPressAuthController::class, 'login'])
+    ->name('admin.auth.wordpress');
 
 // Backpack dashboard → redirect al builder del decorador
 Route::get('/admin/dashboard', function () {
