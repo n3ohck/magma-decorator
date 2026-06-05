@@ -18,7 +18,7 @@ if (! defined('ABSPATH')) exit;
 // Secreto compartido con Laravel. Cámbialo por una cadena aleatoria larga
 // y copia el mismo valor en WORDPRESS_SSO_SECRET del .env de Laravel.
 defined('MAGMA_SSO_SECRET')    || define('MAGMA_SSO_SECRET',    '1bb0d37444ee9195e7c926b7e94e3b97a72bdccc2c9fa3ef');
-defined('MAGMA_DECORATOR_URL') || define('MAGMA_DECORATOR_URL', 'https://decorador.magmasuperficies.com');
+defined('MAGMA_DECORATOR_URL') || define('MAGMA_DECORATOR_URL', 'https://decorador.keya-erp.com');
 defined('MAGMA_SSO_TTL')       || define('MAGMA_SSO_TTL',       120);
 
 // ─── Admin bar ───────────────────────────────────────────────────────────────
