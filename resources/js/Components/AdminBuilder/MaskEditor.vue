@@ -53,16 +53,19 @@
             </button>
         </div>
 
-        <!-- Canvas container -->
+        <!-- Canvas container — forced to canvas_width:canvas_height ratio so the
+             drawing coordinate space exactly matches the mask coordinate space.
+             If the image has a different ratio it shows letterboxed (object-contain). -->
         <div
-            class="relative overflow-hidden rounded-xl select-none"
+            class="relative overflow-hidden rounded-xl select-none w-full bg-black/20"
+            :style="canvasRatio ? { aspectRatio: canvasRatio } : {}"
             :class="activeTool === 'polygon' && !maskReady ? 'cursor-crosshair' : 'cursor-default'"
         >
-            <!-- Base image -->
+            <!-- Base image (letterboxed to canvas ratio if needed) -->
             <img
                 ref="imgRef"
                 :src="imageUrl"
-                class="w-full block"
+                class="absolute inset-0 w-full h-full object-contain"
                 draggable="false"
                 @load="onImageLoad"
             />
@@ -142,12 +145,28 @@
         <div v-if="uploadState === 'error'" class="rounded-lg bg-red-500/20 border border-red-500/30 px-3 py-2 text-xs text-red-300">
             {{ uploadError }}
         </div>
+
+        <!-- Verification overlay: mask preview on top of the base image -->
+        <div v-if="uploadState === 'done' && maskDataUrl" class="space-y-2">
+            <p class="text-[10px] uppercase tracking-[0.2em] text-white/40">Verificación — máscara sobre ambiente</p>
+            <div
+                class="relative overflow-hidden rounded-xl w-full bg-black/20"
+                :style="canvasRatio ? { aspectRatio: canvasRatio } : {}"
+            >
+                <img :src="imageUrl" class="absolute inset-0 w-full h-full object-contain" />
+                <img
+                    :src="maskDataUrl"
+                    class="absolute inset-0 w-full h-full object-contain pointer-events-none"
+                    style="mix-blend-mode: screen; opacity: 0.65;"
+                />
+            </div>
+        </div>
     </div>
 </template>
 
 <script setup>
 import axios from 'axios';
-import { nextTick, ref, watch } from 'vue';
+import { computed, nextTick, ref, watch } from 'vue';
 
 const props = defineProps({
     imageUrl:       { type: String, required: true },
@@ -176,8 +195,17 @@ const samClickPos    = ref(null);
 const samMaskDataUrl = ref(null);
 
 // Upload state
-const uploadState = ref('idle'); // idle | uploading | done | error
-const uploadError = ref('');
+const uploadState  = ref('idle'); // idle | uploading | done | error
+const uploadError  = ref('');
+const maskDataUrl  = ref(null);   // for the verification overlay
+
+// Aspect ratio: canvas_width / canvas_height
+// Forces the drawing container to always use the canvas coordinate space.
+const canvasRatio = computed(() => {
+    const w = props.naturalWidth;
+    const h = props.naturalHeight;
+    return (w && h) ? `${w} / ${h}` : null;
+});
 
 // ── Canvas setup ──────────────────────────────────────────────────────────────
 
@@ -310,6 +338,7 @@ function reset() {
     samError.value       = '';
     uploadState.value    = 'idle';
     uploadError.value    = '';
+    maskDataUrl.value    = null;
     const canvas = canvasRef.value;
     if (canvas) canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
 }
@@ -352,7 +381,9 @@ async function savePolygonMask() {
     mc.height = natH;
     mc.getContext('2d').drawImage(tmp, 0, 0, natW, natH);
 
-    await uploadAndEmit(mc.toDataURL('image/png'));
+    const dataUrl = mc.toDataURL('image/png');
+    maskDataUrl.value = dataUrl;
+    await uploadAndEmit(dataUrl);
 }
 
 async function saveSamMask() {
