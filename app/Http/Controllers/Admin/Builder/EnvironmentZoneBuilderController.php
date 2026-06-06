@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin\Builder;
 use App\Http\Controllers\Controller;
 use App\Models\Environment;
 use App\Models\EnvironmentZone;
+use App\Models\EnvironmentZoneGroup;
 use App\Services\ImageOptimizer;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -17,7 +18,7 @@ class EnvironmentZoneBuilderController extends Controller
     {
         return Inertia::render('Admin/Builder/EnvironmentZones', [
             'items' => EnvironmentZone::query()
-                ->with('environment')
+                ->with(['environment', 'zoneGroup'])
                 ->orderBy('environment_id')
                 ->orderBy('sort_order')
                 ->get(),
@@ -25,6 +26,11 @@ class EnvironmentZoneBuilderController extends Controller
                 ->where('is_active', true)
                 ->orderBy('sort_order')
                 ->orderBy('name')
+                ->get(),
+            'zoneGroups' => EnvironmentZoneGroup::query()
+                ->where('is_active', true)
+                ->orderBy('environment_id')
+                ->orderBy('sort_order')
                 ->get(),
         ]);
     }
@@ -92,6 +98,7 @@ class EnvironmentZoneBuilderController extends Controller
     {
         return $request->validate([
             'environment_id' => ['required', 'exists:environments,id'],
+            'zone_group_id'  => ['nullable', 'exists:environment_zone_groups,id'],
             'name' => ['required', 'string', 'max:255'],
             'slug' => ['nullable', 'string', 'max:255'],
             'zone_type' => ['nullable', 'string', 'max:255'],

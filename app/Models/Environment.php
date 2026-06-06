@@ -57,6 +57,18 @@ class Environment extends Model
             ->orderBy('sort_order');
     }
 
+    public function zoneGroups()
+    {
+        return $this->hasMany(EnvironmentZoneGroup::class)->orderBy('sort_order');
+    }
+
+    public function activeZoneGroups()
+    {
+        return $this->hasMany(EnvironmentZoneGroup::class)
+            ->where('is_active', true)
+            ->orderBy('sort_order');
+    }
+
     public function designSessions()
     {
         return $this->hasMany(DesignSession::class);

@@ -130,6 +130,8 @@
 
                         <ZoneSelector
                             :zones="environment.zones || []"
+                            :groups="environment.active_zone_groups || []"
+                            :selected-materials="selectedMaterials"
                             v-model="selectedZone"
                             :disabled="isApplyingMaterial"
                         />
@@ -337,6 +339,16 @@ const currentZoneMaterial = computed(() => {
 });
 
 
+function buildZoneEntry(zone, material) {
+    return {
+        zone,
+        material,
+        scale:    Number(material.default_scale    || zone.default_texture_scale    || 1),
+        rotation: Number(material.default_rotation || zone.default_texture_rotation || 0),
+        opacity:  Number(material.default_opacity  || zone.default_opacity          || 1),
+    };
+}
+
 function applyMaterial(material) {
     if (isApplyingMaterial.value) return;
 
@@ -350,16 +362,23 @@ function applyMaterial(material) {
         return;
     }
 
-    selectedMaterials.value = {
-        ...selectedMaterials.value,
-        [selectedZone.value.id]: {
-            zone: selectedZone.value,
-            material,
-            scale: Number(material.default_scale || selectedZone.value.default_texture_scale || 1),
-            rotation: Number(material.default_rotation || selectedZone.value.default_texture_rotation || 0),
-            opacity: Number(material.default_opacity || selectedZone.value.default_opacity || 1),
-        },
-    };
+    // Si la zona pertenece a un grupo, aplica a todas las zonas del grupo
+    const group = (props.environment.active_zone_groups || []).find(
+        (g) => (g.active_zones || g.zones || []).some((z) => z.id === selectedZone.value.id)
+    );
+
+    const updates = {};
+
+    if (group) {
+        const groupZones = group.active_zones || group.zones || [];
+        for (const zone of groupZones) {
+            updates[zone.id] = buildZoneEntry(zone, material);
+        }
+    } else {
+        updates[selectedZone.value.id] = buildZoneEntry(selectedZone.value, material);
+    }
+
+    selectedMaterials.value = { ...selectedMaterials.value, ...updates };
 }
 
 function clearMaterials() {

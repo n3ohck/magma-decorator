@@ -25,6 +25,7 @@ class DecoratorController extends Controller
             'zones' => fn ($query) => $query
                 ->where('is_active', true)
                 ->orderBy('sort_order'),
+            'activeZoneGroups.activeZones',
         ]);
 
         return Inertia::render('Decorator/Show', [

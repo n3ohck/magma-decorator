@@ -11,6 +11,7 @@ class EnvironmentZone extends Model
 
     protected $fillable = [
         'environment_id',
+        'zone_group_id',
         'name',
         'slug',
         'zone_type',
@@ -27,6 +28,7 @@ class EnvironmentZone extends Model
 
     protected $casts = [
         'environment_id' => 'integer',
+        'zone_group_id'  => 'integer',
         'polygon_points' => 'array',
         'perspective_points' => 'array',
         'supports_perspective' => 'boolean',
@@ -44,6 +46,11 @@ class EnvironmentZone extends Model
     public function environment()
     {
         return $this->belongsTo(Environment::class);
+    }
+
+    public function zoneGroup()
+    {
+        return $this->belongsTo(EnvironmentZoneGroup::class, 'zone_group_id');
     }
 
     public function designSessionItems()

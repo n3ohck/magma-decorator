@@ -6,6 +6,7 @@ use App\Http\Controllers\Admin\Builder\MaterialCategoryBuilderController;
 use App\Http\Controllers\Admin\Builder\MaterialBuilderController;
 use App\Http\Controllers\Admin\Builder\EnvironmentBuilderController;
 use App\Http\Controllers\Admin\Builder\EnvironmentZoneBuilderController;
+use App\Http\Controllers\Admin\Builder\EnvironmentZoneGroupBuilderController;
 use App\Http\Controllers\Admin\Builder\LeadBuilderController;
 
 // --------------------------
@@ -103,6 +104,24 @@ Route::group([
 
     Route::delete('builder/environment-zones/{environmentZone}', [EnvironmentZoneBuilderController::class, 'destroy'])
         ->name('builder.environment-zones.destroy');
+
+    /*
+    |--------------------------------------------------------------------------
+    | Grupos de zonas
+    |--------------------------------------------------------------------------
+    */
+
+    Route::get('builder/environment-zone-groups', [EnvironmentZoneGroupBuilderController::class, 'index'])
+        ->name('builder.environment-zone-groups.index');
+
+    Route::post('builder/environment-zone-groups', [EnvironmentZoneGroupBuilderController::class, 'store'])
+        ->name('builder.environment-zone-groups.store');
+
+    Route::post('builder/environment-zone-groups/{environmentZoneGroup}', [EnvironmentZoneGroupBuilderController::class, 'update'])
+        ->name('builder.environment-zone-groups.update');
+
+    Route::delete('builder/environment-zone-groups/{environmentZoneGroup}', [EnvironmentZoneGroupBuilderController::class, 'destroy'])
+        ->name('builder.environment-zone-groups.destroy');
 
     /*
     |--------------------------------------------------------------------------

@@ -23,6 +23,7 @@
                         <th class="p-4">Máscara</th>
                         <th class="p-4">Zona</th>
                         <th class="p-4">Ambiente</th>
+                        <th class="p-4">Grupo</th>
                         <th class="p-4">Tipo</th>
                         <th class="p-4">Activa</th>
                         <th class="p-4 text-right">Acciones</th>
@@ -54,6 +55,18 @@
 
                         <td class="p-4 text-white/60">
                             {{ item.environment?.name || 'Sin ambiente' }}
+                        </td>
+
+                        <td class="p-4">
+                            <span
+                                v-if="item.zone_group"
+                                class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium"
+                                :style="{ backgroundColor: (item.zone_group.color || '#CC1A1A') + '33', color: item.zone_group.color || '#CC1A1A' }"
+                            >
+                                <span class="h-2 w-2 rounded-full" :style="{ backgroundColor: item.zone_group.color || '#CC1A1A' }" />
+                                {{ item.zone_group.name }}
+                            </span>
+                            <span v-else class="text-xs text-white/25">—</span>
                         </td>
 
                         <td class="p-4 text-white/60">
@@ -183,6 +196,24 @@
                     <div>
                         <label class="label">Slug</label>
                         <input v-model="form.slug" class="input" type="text" placeholder="piso" @input="slugTouched = true" />
+                    </div>
+
+                    <div class="md:col-span-2">
+                        <label class="label">Grupo de zonas (opcional)</label>
+                        <select v-model="form.zone_group_id" class="input">
+                            <option :value="null">Sin grupo</option>
+                            <option
+                                v-for="group in filteredZoneGroups"
+                                :key="group.id"
+                                :value="group.id"
+                            >
+                                {{ group.name }}
+                            </option>
+                        </select>
+                        <p v-if="!filteredZoneGroups.length && form.environment_id" class="mt-1 text-xs text-white/30">
+                            No hay grupos para este ambiente.
+                            <a href="/admin/builder/environment-zone-groups" class="text-violet-400 underline">Crear grupos →</a>
+                        </p>
                     </div>
 
                     <div>
@@ -329,6 +360,10 @@ const props = defineProps({
         type: Array,
         default: () => [],
     },
+    zoneGroups: {
+        type: Array,
+        default: () => [],
+    },
 });
 
 const drawerOpen = ref(false);
@@ -429,6 +464,7 @@ function autoSlug() {
 
 const form = useForm({
     environment_id: '',
+    zone_group_id: null,
     name: '',
     slug: '',
     zone_type: '',
@@ -449,11 +485,17 @@ const selectedEnvironment = computed(() => {
     return props.environments.find((environment) => Number(environment.id) === Number(form.environment_id));
 });
 
+const filteredZoneGroups = computed(() => {
+    if (!form.environment_id) return [];
+    return props.zoneGroups.filter((g) => Number(g.environment_id) === Number(form.environment_id));
+});
+
 function resetForm() {
     form.clearErrors();
     form.reset();
 
     form.environment_id = '';
+    form.zone_group_id = null;
     form.name = '';
     form.slug = '';
     form.zone_type = '';
@@ -488,6 +530,7 @@ function openEdit(item) {
     samAppliedMaskUrl.value = null;
 
     form.environment_id = item.environment_id || '';
+    form.zone_group_id  = item.zone_group_id || null;
     form.name = item.name || '';
     form.slug = item.slug || '';
     form.zone_type = item.zone_type || '';
@@ -510,6 +553,7 @@ function submit() {
     const fd = new FormData();
 
     fd.append('environment_id',         form.environment_id ?? '');
+    fd.append('zone_group_id',          form.zone_group_id ?? '');
     fd.append('name',                   form.name ?? '');
     fd.append('slug',                   form.slug ?? '');
     fd.append('zone_type',              form.zone_type ?? '');
