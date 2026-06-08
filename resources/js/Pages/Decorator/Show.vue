@@ -130,8 +130,6 @@
 
                         <ZoneSelector
                             :zones="environment.zones || []"
-                            :groups="environment.active_zone_groups || []"
-                            :selected-materials="selectedMaterials"
                             v-model="selectedZone"
                             :disabled="isApplyingMaterial"
                         />
