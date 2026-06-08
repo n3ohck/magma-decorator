@@ -15,6 +15,8 @@ class EnvironmentZoneGroup extends Model
         'slug',
         'color',
         'icon',
+        'label_x',
+        'label_y',
         'is_active',
         'sort_order',
     ];
@@ -23,6 +25,8 @@ class EnvironmentZoneGroup extends Model
         'environment_id' => 'integer',
         'is_active'      => 'boolean',
         'sort_order'     => 'integer',
+        'label_x'        => 'float',
+        'label_y'        => 'float',
     ];
 
     public function environment()

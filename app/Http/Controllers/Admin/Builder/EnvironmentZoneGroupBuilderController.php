@@ -90,6 +90,8 @@ class EnvironmentZoneGroupBuilderController extends Controller
             'slug'           => ['nullable', 'string', 'max:255'],
             'color'          => ['nullable', 'string', 'max:20'],
             'icon'           => ['nullable', 'string', 'max:100'],
+            'label_x'        => ['nullable', 'numeric', 'min:0', 'max:1'],
+            'label_y'        => ['nullable', 'numeric', 'min:0', 'max:1'],
             'is_active'      => ['nullable', 'boolean'],
             'sort_order'     => ['nullable', 'integer', 'min:0'],
             'zone_ids'       => ['nullable', 'array'],

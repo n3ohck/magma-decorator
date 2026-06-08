@@ -115,6 +115,69 @@
                 </div>
             </transition>
 
+            <!-- Zone group dots overlay -->
+            <div
+                v-if="stageReady"
+                class="absolute pointer-events-none"
+                :style="{
+                    width:  displayWidth  + 'px',
+                    height: displayHeight + 'px',
+                }"
+            >
+                <template v-for="group in activeGroupsWithLabel" :key="group.id">
+                    <div
+                        class="absolute pointer-events-auto"
+                        :style="{
+                            left:      (group.label_x * 100) + '%',
+                            top:       (group.label_y * 100) + '%',
+                            transform: 'translate(-50%, -50%)',
+                        }"
+                        @mouseenter="hoveredGroup = group.id"
+                        @mouseleave="hoveredGroup = null"
+                    >
+                        <!-- Pulse ring -->
+                        <span
+                            class="absolute inset-0 rounded-full animate-ping opacity-60"
+                            :style="{ backgroundColor: group.color || '#CC1A1A' }"
+                        />
+
+                        <!-- Dot button -->
+                        <button
+                            type="button"
+                            class="relative flex h-7 w-7 items-center justify-center rounded-full border-2 border-white font-bold text-white shadow-lg transition-transform hover:scale-110 text-sm leading-none"
+                            :style="{ backgroundColor: group.color || '#CC1A1A' }"
+                        >
+                            +
+                        </button>
+
+                        <!-- Tooltip -->
+                        <transition name="tip-fade">
+                            <div
+                                v-if="hoveredGroup === group.id"
+                                class="absolute bottom-full left-1/2 mb-2 -translate-x-1/2 pointer-events-none z-30"
+                            >
+                                <div
+                                    class="whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-semibold text-white shadow-xl"
+                                    :style="{ backgroundColor: group.color || '#CC1A1A' }"
+                                >
+                                    {{ group.name }}
+                                </div>
+                                <!-- Arrow -->
+                                <div
+                                    class="mx-auto mt-0.5 h-0 w-0"
+                                    :style="{
+                                        borderLeft: '5px solid transparent',
+                                        borderRight: '5px solid transparent',
+                                        borderTop: `5px solid ${group.color || '#CC1A1A'}`,
+                                        width: 'fit-content',
+                                    }"
+                                />
+                            </div>
+                        </transition>
+                    </div>
+                </template>
+            </div>
+
             <div class="absolute left-3 bottom-3 bg-black/70 backdrop-blur px-3 py-1.5 text-[10px] text-white/50 uppercase tracking-[0.15em]">
                 <span class="font-semibold text-white/80">{{ environment.name }}</span>
                 <span v-if="selectedZone"> · {{ selectedZone.name }}</span>
@@ -164,6 +227,13 @@ let renderToken = 0;
 
 const isApplying = ref(false);
 const foregroundOpacity = ref(1);
+const hoveredGroup = ref(null);
+
+const activeGroupsWithLabel = computed(() => {
+    return (props.environment.active_zone_groups || []).filter(
+        (g) => g.label_x != null && g.label_y != null,
+    );
+});
 
 // Effective canvas dimensions: use the base image's NATURAL dimensions once loaded,
 // falling back to environment.canvas_width/height. This avoids stretching the image
@@ -706,5 +776,16 @@ onBeforeUnmount(() => {
 .canvas-fade-enter-from,
 .canvas-fade-leave-to {
     opacity: 0;
+}
+
+.tip-fade-enter-active,
+.tip-fade-leave-active {
+    transition: opacity 120ms ease, transform 120ms ease;
+}
+
+.tip-fade-enter-from,
+.tip-fade-leave-to {
+    opacity: 0;
+    transform: translateX(-50%) translateY(4px);
 }
 </style>

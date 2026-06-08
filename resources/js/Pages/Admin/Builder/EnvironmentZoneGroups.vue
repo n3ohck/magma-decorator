@@ -23,6 +23,7 @@
                     <th class="p-4">Grupo</th>
                     <th class="p-4">Ambiente</th>
                     <th class="p-4">Zonas</th>
+                    <th class="p-4">Punto</th>
                     <th class="p-4">Activo</th>
                     <th class="p-4 text-right">Acciones</th>
                 </tr>
@@ -66,6 +67,15 @@
 
                     <td class="p-4">
                         <span
+                            class="text-xs"
+                            :class="item.label_x != null ? 'text-emerald-400' : 'text-white/25'"
+                        >
+                            {{ item.label_x != null ? `${Math.round(item.label_x * 100)}%, ${Math.round(item.label_y * 100)}%` : 'Sin punto' }}
+                        </span>
+                    </td>
+
+                    <td class="p-4">
+                        <span
                             class="rounded-full px-3 py-1 text-xs"
                             :class="item.is_active ? 'bg-emerald-500/20 text-emerald-200' : 'bg-red-500/20 text-red-200'"
                         >
@@ -84,7 +94,7 @@
                 </tr>
 
                 <tr v-if="!items.length">
-                    <td colspan="6" class="p-8 text-center text-white/50">
+                    <td colspan="7" class="p-8 text-center text-white/50">
                         No hay grupos registrados.
                     </td>
                 </tr>
@@ -169,6 +179,64 @@
                         </div>
                     </div>
 
+                    <!-- Picker de posición del punto -->
+                    <div class="md:col-span-2">
+                        <label class="label">Posición del punto en la imagen</label>
+                        <p class="mb-2 text-xs text-white/40">Haz clic en la imagen para colocar el punto (+) que verá el usuario.</p>
+
+                        <div v-if="!selectedEnvironment?.base_image_url" class="rounded-2xl border border-dashed border-white/10 p-4 text-sm text-white/30">
+                            {{ form.environment_id ? 'Este ambiente no tiene imagen base.' : 'Selecciona un ambiente para ver la imagen.' }}
+                        </div>
+
+                        <div
+                            v-else
+                            ref="pickerRef"
+                            class="relative cursor-crosshair overflow-hidden rounded-2xl border border-white/10 select-none"
+                            style="max-height: 260px;"
+                            @click="onPickerClick"
+                        >
+                            <img
+                                :src="selectedEnvironment.base_image_url"
+                                class="w-full object-cover pointer-events-none"
+                                style="max-height: 260px; display: block;"
+                                draggable="false"
+                            />
+
+                            <!-- Dot preview -->
+                            <div
+                                v-if="form.label_x != null"
+                                class="absolute pointer-events-none"
+                                :style="{
+                                    left: (form.label_x * 100) + '%',
+                                    top:  (form.label_y * 100) + '%',
+                                    transform: 'translate(-50%, -50%)',
+                                }"
+                            >
+                                <div
+                                    class="flex h-7 w-7 items-center justify-center rounded-full border-2 border-white text-white font-bold text-sm shadow-lg"
+                                    :style="{ backgroundColor: form.color || '#CC1A1A' }"
+                                >
+                                    +
+                                </div>
+                                <div
+                                    class="absolute top-full left-1/2 -translate-x-1/2 mt-1.5 whitespace-nowrap rounded-lg px-2 py-1 text-xs font-semibold text-white shadow"
+                                    :style="{ backgroundColor: form.color || '#CC1A1A' }"
+                                >
+                                    {{ form.name || 'Grupo' }}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div v-if="form.label_x != null" class="mt-2 flex items-center justify-between">
+                            <p class="text-xs text-white/40">
+                                Posición: {{ Math.round(form.label_x * 100) }}%, {{ Math.round(form.label_y * 100) }}%
+                            </p>
+                            <button type="button" class="text-xs text-red-400 hover:text-red-300" @click="clearLabel">
+                                Quitar punto
+                            </button>
+                        </div>
+                    </div>
+
                     <label class="flex items-center gap-3">
                         <input v-model="form.is_active" type="checkbox" class="h-5 w-5" />
                         <span class="text-sm text-white/80">Activo</span>
@@ -203,6 +271,7 @@ const props = defineProps({
 const drawerOpen  = ref(false);
 const editingItem = ref(null);
 const slugTouched = ref(false);
+const pickerRef   = ref(null);
 
 const form = useForm({
     environment_id: '',
@@ -210,15 +279,31 @@ const form = useForm({
     slug:           '',
     color:          '#CC1A1A',
     icon:           '',
+    label_x:        null,
+    label_y:        null,
     is_active:      true,
     sort_order:     0,
     zone_ids:       [],
 });
 
-const selectedEnvironmentZones = computed(() => {
-    const env = props.environments.find((e) => Number(e.id) === Number(form.environment_id));
-    return env?.zones || [];
+const selectedEnvironment = computed(() => {
+    return props.environments.find((e) => Number(e.id) === Number(form.environment_id)) || null;
 });
+
+const selectedEnvironmentZones = computed(() => {
+    return selectedEnvironment.value?.zones || [];
+});
+
+function onPickerClick(e) {
+    const rect = pickerRef.value.getBoundingClientRect();
+    form.label_x = parseFloat(((e.clientX - rect.left) / rect.width).toFixed(4));
+    form.label_y = parseFloat(((e.clientY - rect.top)  / rect.height).toFixed(4));
+}
+
+function clearLabel() {
+    form.label_x = null;
+    form.label_y = null;
+}
 
 function toSlug(value) {
     return value
@@ -242,6 +327,8 @@ function resetForm() {
     form.slug           = '';
     form.color          = '#CC1A1A';
     form.icon           = '';
+    form.label_x        = null;
+    form.label_y        = null;
     form.is_active      = true;
     form.sort_order     = 0;
     form.zone_ids       = [];
@@ -264,6 +351,8 @@ function openEdit(item) {
     form.slug           = item.slug || '';
     form.color          = item.color || '#CC1A1A';
     form.icon           = item.icon || '';
+    form.label_x        = item.label_x ?? null;
+    form.label_y        = item.label_y ?? null;
     form.is_active      = Boolean(item.is_active);
     form.sort_order     = item.sort_order || 0;
     form.zone_ids       = (item.zones || []).map((z) => z.id);
