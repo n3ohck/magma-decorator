@@ -8,6 +8,8 @@ use App\Models\EnvironmentZone;
 use App\Models\Lead;
 use App\Models\Material;
 use App\Models\MaterialCategory;
+use App\Models\Setting;
+use Illuminate\Http\Request;
 use Inertia\Inertia;
 
 class BuilderController extends Controller
@@ -29,6 +31,23 @@ class BuilderController extends Controller
                 ->latest()
                 ->limit(5)
                 ->get(),
+            'settings' => [
+                'ai_render_enabled' => Setting::getBool('ai_render_enabled', true),
+            ],
         ]);
+    }
+
+    /**
+     * Actualiza las preferencias globales del decorador (toggles del builder).
+     */
+    public function updateSettings(Request $request)
+    {
+        $data = $request->validate([
+            'ai_render_enabled' => ['required', 'boolean'],
+        ]);
+
+        Setting::set('ai_render_enabled', $data['ai_render_enabled'] ? '1' : '0');
+
+        return back()->with('success', 'Preferencias actualizadas correctamente.');
     }
 }

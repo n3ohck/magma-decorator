@@ -33,6 +33,10 @@ Route::group([
     Route::get('builder', [BuilderController::class, 'index'])
         ->name('builder.index');
 
+    // Preferencias globales del decorador (toggles del dashboard)
+    Route::post('builder/settings', [BuilderController::class, 'updateSettings'])
+        ->name('builder.settings.update');
+
     /*
     |--------------------------------------------------------------------------
     | Categorías de materiales

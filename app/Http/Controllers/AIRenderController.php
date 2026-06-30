@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Setting;
 use App\Services\ReplicateService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -21,6 +22,10 @@ class AIRenderController extends Controller
      */
     public function create(Request $request, ReplicateService $replicate): JsonResponse
     {
+        if (! Setting::getBool('ai_render_enabled', true)) {
+            return response()->json(['error' => 'El render con IA está deshabilitado.'], 403);
+        }
+
         if (! $replicate->isConfigured()) {
             return response()->json(['error' => 'Replicate API token no configurado.'], 503);
         }

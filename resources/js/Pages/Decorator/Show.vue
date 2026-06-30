@@ -259,6 +259,7 @@
                         -->
 
                         <button
+                            v-if="aiRenderEnabled"
                             type="button"
                             class="w-full h-11 border border-white/15 text-white/60 text-xs font-bold uppercase tracking-[0.2em] hover:border-white/35 hover:text-white transition flex items-center justify-center gap-2 disabled:opacity-30"
                             :disabled="isApplyingMaterial"
@@ -306,6 +307,10 @@ const props = defineProps({
     categories: {
         type: Array,
         required: true,
+    },
+    aiRenderEnabled: {
+        type: Boolean,
+        default: true,
     },
 });
 

@@ -34,10 +34,26 @@
                     Diseña tu espacio<br />con materiales reales
                 </h1>
 
-                <p class="mt-5 text-base text-white/50 max-w-xl leading-relaxed">
-                    Visualiza mármoles, cuarzos, cuarcitas y piedras naturales en
-                    pisos, muros y cubiertas. Selecciona un ambiente para comenzar.
+                <p class="mt-6 text-xl md:text-2xl text-white/80 max-w-xl leading-snug font-light">
+                    Visualiza espacios con <span class="relative font-medium text-white whitespace-nowrap">materiales reales<span class="absolute -bottom-1 left-0 h-px w-full bg-gradient-to-r from-[#CC1A1A] to-transparent"></span></span>.
                 </p>
+
+                <p class="mt-4 text-sm text-white/40 max-w-xl leading-relaxed">
+                    Aplica mármoles, cuarzos, cuarcitas y piedras naturales sobre
+                    pisos, muros y cubiertas, y observa el resultado al instante.
+                </p>
+
+                <!-- Call to action / guía -->
+                <div class="mt-7 inline-flex items-center gap-3 rounded-full border border-white/10 bg-white/[0.04] pl-4 pr-5 py-2.5">
+                    <span class="relative flex h-2.5 w-2.5">
+                        <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#CC1A1A] opacity-70"></span>
+                        <span class="relative inline-flex h-2.5 w-2.5 rounded-full bg-[#CC1A1A]"></span>
+                    </span>
+                    <span class="text-sm font-medium text-white/90 tracking-wide">
+                        Selecciona un ambiente para comenzar
+                    </span>
+                    <span class="text-white/40 animate-bounce">↓</span>
+                </div>
             </div>
 
             <!-- Divider -->

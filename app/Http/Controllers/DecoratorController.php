@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Environment;
 use App\Models\MaterialCategory;
+use App\Models\Setting;
 use Inertia\Inertia;
 
 class DecoratorController extends Controller
@@ -41,6 +42,7 @@ class DecoratorController extends Controller
                 ->orderBy('sort_order')
                 ->orderBy('name')
                 ->get(),
+            'aiRenderEnabled' => Setting::getBool('ai_render_enabled', true),
         ]);
     }
 }
