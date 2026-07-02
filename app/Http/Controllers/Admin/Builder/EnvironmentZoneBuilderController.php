@@ -115,6 +115,7 @@ class EnvironmentZoneBuilderController extends Controller
             'default_texture_rotation' => ['nullable', 'numeric'],
             'default_opacity' => ['nullable', 'numeric', 'min:0', 'max:1'],
             'supports_perspective' => ['nullable', 'boolean'],
+            'default_book_match' => ['nullable', 'boolean'],
             'polygon_points' => ['nullable', 'string'],
             'perspective_points' => ['nullable', 'string'],
             'sam_mask_path'      => ['nullable', 'string', 'max:500'],

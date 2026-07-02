@@ -60,6 +60,7 @@
                         :selected-zone="selectedZone"
                         :selected-materials="selectedMaterials"
                         @applying-change="isApplyingMaterial = $event"
+                        @select-group="selectGroup"
                     />
                 </section>
 
@@ -131,6 +132,7 @@
                         <ZoneSelector
                             :zones="environment.zones || []"
                             v-model="selectedZone"
+                            :active-group-zone-ids="activeGroupZoneIds"
                             :disabled="isApplyingMaterial"
                         />
                     </section>
@@ -232,6 +234,30 @@
                                     class="w-full h-px accent-[#CC1A1A] disabled:opacity-30"
                                     @input="updateAdjustment('rotation', Number($event.target.value))"
                                 />
+                            </div>
+
+                            <!-- Book Match: espejo 4 vías (H+V) sobre esta capa -->
+                            <div class="flex items-center justify-between pt-1">
+                                <div class="min-w-0 pr-3">
+                                    <span class="text-[10px] uppercase tracking-[0.2em] text-white/40">Book Match</span>
+                                    <p class="text-[10px] text-white/25 mt-0.5 leading-tight">
+                                        Espeja la textura para un veteado simétrico.
+                                    </p>
+                                </div>
+                                <button
+                                    type="button"
+                                    role="switch"
+                                    :aria-checked="!!currentZoneMaterial.bookMatch"
+                                    :disabled="isApplyingMaterial"
+                                    class="relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition disabled:opacity-30"
+                                    :class="currentZoneMaterial.bookMatch ? 'bg-[#CC1A1A]' : 'bg-white/15'"
+                                    @click="toggleBookMatch"
+                                >
+                                    <span
+                                        class="inline-block h-4 w-4 transform rounded-full bg-white shadow transition"
+                                        :class="currentZoneMaterial.bookMatch ? 'translate-x-6' : 'translate-x-1'"
+                                    />
+                                </button>
                             </div>
 
                             <button
@@ -342,13 +368,50 @@ const currentZoneMaterial = computed(() => {
 });
 
 
+// Grupo al que pertenece la zona seleccionada (para resaltar sus hermanas).
+const activeGroup = computed(() => {
+    const zid = selectedZone.value?.id;
+    if (zid == null) return null;
+    return (props.environment.active_zone_groups || []).find(
+        (g) => (g.active_zones || g.zones || []).some((z) => z.id === zid),
+    ) || null;
+});
+
+const activeGroupZoneIds = computed(() => {
+    const group = activeGroup.value;
+    if (!group) return [];
+    return (group.active_zones || group.zones || []).map((z) => z.id);
+});
+
+// Zonas que deben recibir un ajuste (escala/rotación): todas las del grupo activo
+// que tengan material aplicado; si la zona no pertenece a un grupo, sólo ella.
+const adjustmentTargetZoneIds = computed(() => {
+    const zid = selectedZone.value?.id;
+    if (zid == null) return [];
+    const ids = activeGroupZoneIds.value.length ? activeGroupZoneIds.value : [zid];
+    return ids.filter((id) => selectedMaterials.value[id]);
+});
+
+// Clic en el punto del canvas → selecciona el grupo (su primera zona).
+// El material se aplica a todo el grupo, así que basta con activar una zona.
+function selectGroup(group) {
+    if (isApplyingMaterial.value) return;
+    const zones = group.active_zones || group.zones || [];
+    if (!zones.length) return;
+    selectedZone.value = zones[0];
+}
+
+// Toda textura recién aplicada arranca con esta escala.
+const INITIAL_TEXTURE_SCALE = 0.3;
+
 function buildZoneEntry(zone, material) {
     return {
         zone,
         material,
-        scale:    Number(material.default_scale    || zone.default_texture_scale    || 1),
-        rotation: Number(material.default_rotation || zone.default_texture_rotation || 0),
-        opacity:  Number(material.default_opacity  || zone.default_opacity          || 1),
+        scale:     INITIAL_TEXTURE_SCALE,
+        rotation:  Number(material.default_rotation || zone.default_texture_rotation || 0),
+        opacity:   Number(material.default_opacity  || zone.default_opacity          || 1),
+        bookMatch: Boolean(zone.default_book_match),
     };
 }
 
@@ -389,28 +452,47 @@ function clearMaterials() {
 }
 
 function updateAdjustment(prop, value) {
-    if (!selectedZone.value || !currentZoneMaterial.value) return;
-    const zoneId = selectedZone.value.id;
-    selectedMaterials.value = {
-        ...selectedMaterials.value,
-        [zoneId]: {
-            ...selectedMaterials.value[zoneId],
-            [prop]: value,
-        },
-    };
+    if (!currentZoneMaterial.value) return;
+    const ids = adjustmentTargetZoneIds.value;
+    if (!ids.length) return;
+
+    const next = { ...selectedMaterials.value };
+    for (const id of ids) {
+        if (!next[id]) continue;
+        next[id] = { ...next[id], [prop]: value };
+    }
+    selectedMaterials.value = next;
 }
 
 function resetAdjustments() {
+    if (!currentZoneMaterial.value) return;
+    const ids = adjustmentTargetZoneIds.value;
+    if (!ids.length) return;
+
+    const next = { ...selectedMaterials.value };
+    for (const id of ids) {
+        const entry = next[id];
+        if (!entry) continue;
+        const { material, zone } = entry;
+        next[id] = {
+            ...entry,
+            scale: INITIAL_TEXTURE_SCALE,
+            rotation: Number(material.default_rotation || zone.default_texture_rotation || 0),
+            bookMatch: false,
+        };
+    }
+    selectedMaterials.value = next;
+}
+
+// Book Match aplica SÓLO a la capa seleccionada (individual), aunque pertenezca a un grupo.
+function toggleBookMatch() {
     if (!selectedZone.value || !currentZoneMaterial.value) return;
     const zoneId = selectedZone.value.id;
-    const { material, zone } = selectedMaterials.value[zoneId];
+    const entry = selectedMaterials.value[zoneId];
+    if (!entry) return;
     selectedMaterials.value = {
         ...selectedMaterials.value,
-        [zoneId]: {
-            ...selectedMaterials.value[zoneId],
-            scale: Number(material.default_scale || zone.default_texture_scale || 1),
-            rotation: Number(material.default_rotation || zone.default_texture_rotation || 0),
-        },
+        [zoneId]: { ...entry, bookMatch: !entry.bookMatch },
     };
 }
 </script>

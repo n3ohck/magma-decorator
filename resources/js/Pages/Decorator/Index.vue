@@ -31,7 +31,7 @@
                 </p>
 
                 <h1 class="mt-4 text-4xl md:text-6xl font-bold text-white leading-tight uppercase tracking-tight">
-                    Diseña tu espacio<br />con materiales reales
+                    Diseña tu espacio<br />a tu medida
                 </h1>
 
                 <p class="mt-6 text-xl md:text-2xl text-white/80 max-w-xl leading-snug font-light">
@@ -44,20 +44,36 @@
                 </p>
 
                 <!-- Call to action / guía -->
-                <div class="mt-7 inline-flex items-center gap-3 rounded-full border border-white/10 bg-white/[0.04] pl-4 pr-5 py-2.5">
-                    <span class="relative flex h-2.5 w-2.5">
-                        <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#CC1A1A] opacity-70"></span>
-                        <span class="relative inline-flex h-2.5 w-2.5 rounded-full bg-[#CC1A1A]"></span>
-                    </span>
-                    <span class="text-sm font-medium text-white/90 tracking-wide">
-                        Selecciona un ambiente para comenzar
-                    </span>
-                    <span class="text-white/40 animate-bounce">↓</span>
+                <div class="mt-7 flex flex-wrap items-center gap-3">
+                    <button
+                        type="button"
+                        class="group inline-flex items-center gap-3 rounded-full border border-white/10 bg-white/[0.04] pl-4 pr-5 py-2.5 hover:border-white/25 hover:bg-white/[0.07] transition"
+                        @click="scrollToAmbientes"
+                    >
+                        <span class="relative flex h-2.5 w-2.5">
+                            <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#CC1A1A] opacity-70"></span>
+                            <span class="relative inline-flex h-2.5 w-2.5 rounded-full bg-[#CC1A1A]"></span>
+                        </span>
+                        <span class="text-sm font-medium text-white/90 tracking-wide">
+                            Selecciona un ambiente para comenzar
+                        </span>
+                        <span class="text-white/40 animate-bounce">↓</span>
+                    </button>
+
+                    <a
+                        href="https://magmasuperficies.com/contacto"
+                        target="_blank"
+                        rel="noopener"
+                        class="inline-flex items-center gap-2 rounded-full bg-[#CC1A1A] px-6 py-3 text-sm font-bold uppercase tracking-[0.15em] text-white hover:bg-[#E01F1F] transition"
+                    >
+                        Cotiza tu proyecto
+                        <span aria-hidden="true">→</span>
+                    </a>
                 </div>
             </div>
 
             <!-- Divider -->
-            <div class="mt-14 mb-10 flex items-center gap-4">
+            <div ref="ambientesRef" class="scroll-mt-24 mt-14 mb-10 flex items-center gap-4">
                 <span class="text-xs uppercase tracking-[0.3em] text-white/30">Ambientes disponibles</span>
                 <div class="flex-1 h-px bg-white/8"></div>
                 <span class="text-xs text-white/20">{{ environments.length }}</span>
@@ -117,10 +133,18 @@
 </template>
 
 <script setup>
+import { ref } from 'vue';
+
 defineProps({
     environments: {
         type: Array,
         required: true,
     },
 });
+
+const ambientesRef = ref(null);
+
+function scrollToAmbientes() {
+    ambientesRef.value?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
 </script>

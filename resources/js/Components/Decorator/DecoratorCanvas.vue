@@ -61,7 +61,7 @@
                     />
                 </v-layer>
 
-                <!-- Foreground: objetos que van encima -->
+                <!-- Foreground: objetos que van encima + highlight de zonas del grupo -->
                 <v-layer>
                     <v-image
                         v-if="foregroundImage"
@@ -72,6 +72,20 @@
                             width: canvasWidth,
                             height: canvasHeight,
                             opacity: foregroundOpacity
+                        }"
+                    />
+
+                    <!-- Highlight de zonas del grupo activo (sólo en hover del punto) -->
+                    <v-image
+                        v-if="highlightImage"
+                        :config="{
+                            image: highlightImage,
+                            x: 0,
+                            y: 0,
+                            width: canvasWidth,
+                            height: canvasHeight,
+                            opacity: highlightOpacityValue,
+                            listening: false,
                         }"
                     />
                 </v-layer>
@@ -144,8 +158,10 @@
                         <!-- Dot button -->
                         <button
                             type="button"
-                            class="relative flex h-7 w-7 items-center justify-center rounded-full border-2 border-white font-bold text-white shadow-lg transition-transform hover:scale-110 text-sm leading-none"
+                            class="relative flex h-7 w-7 items-center justify-center rounded-full border-2 border-white font-bold text-white shadow-lg transition-transform hover:scale-110 text-sm leading-none cursor-pointer"
                             :style="{ backgroundColor: group.color || '#CC1A1A' }"
+                            :aria-label="`Seleccionar ${group.name}`"
+                            @click="emit('select-group', group)"
                         >
                             +
                         </button>
@@ -204,7 +220,7 @@ const props = defineProps({
     },
 });
 
-const emit = defineEmits(['applying-change']);
+const emit = defineEmits(['applying-change', 'select-group']);
 
 const stageRef = ref(null);
 
@@ -295,6 +311,98 @@ const foregroundImage = ref(null);
 const grainImage = ref(null);
 
 const renderedZoneImages = ref([]);
+
+// ── Iluminación de zonas por grupo ────────────────────────────────────────────
+// Tinte suave del color del grupo, recortado a las máscaras de sus zonas.
+// Se enciende al hacer hover sobre el punto o cuando el grupo está seleccionado.
+const groupHighlights = ref({});   // { [groupId]: HTMLCanvasElement }
+
+// El highlight se muestra ÚNICAMENTE al hacer hover sobre el punto del grupo.
+const highlightImage = computed(() => {
+    const id = hoveredGroup.value;
+    if (id == null) return null;
+    return groupHighlights.value[id] || null;
+});
+
+// Pulso muy sutil mientras se mantiene el hover (~12% de opacidad promedio).
+const highlightPulse = ref(0.12);
+let highlightRAF = null;
+
+function startHighlightPulse() {
+    if (highlightRAF) return;
+    const loop = () => {
+        const t = performance.now() / 1000;
+        highlightPulse.value = 0.09 + 0.06 * (0.5 + 0.5 * Math.sin(t * 2.4));
+        highlightRAF = requestAnimationFrame(loop);
+    };
+    highlightRAF = requestAnimationFrame(loop);
+}
+
+function stopHighlightPulse() {
+    if (highlightRAF) {
+        cancelAnimationFrame(highlightRAF);
+        highlightRAF = null;
+    }
+}
+
+const highlightOpacityValue = computed(() => {
+    return hoveredGroup.value != null ? highlightPulse.value : 0;
+});
+
+watch(hoveredGroup, (val) => {
+    if (val != null) startHighlightPulse();
+    else stopHighlightPulse();
+});
+
+// Construye un canvas teñido con el color del grupo, recortado a las máscaras
+// (con alpha) de todas sus zonas. Bordes suavizados para un look elegante.
+// Tinte blanco para un "glow" elegante que ilumina la zona sin aportar color.
+const HIGHLIGHT_COLOR = '#FFFFFF';
+
+async function buildGroupHighlight(group) {
+    const zones = group.active_zones || group.zones || [];
+    const w = canvasWidth.value;
+    const h = canvasHeight.value;
+    const color = HIGHLIGHT_COLOR;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d');
+
+    let painted = false;
+
+    for (const zone of zones) {
+        if (!zone.mask_image_url) continue;
+
+        const mask = await loadImage(zone.mask_image_url);
+        if (!mask) continue;
+
+        // Tiñe la forma de la máscara con el color del grupo (source-in usa el alpha).
+        const tinted = document.createElement('canvas');
+        tinted.width = w;
+        tinted.height = h;
+        const tctx = tinted.getContext('2d');
+        tctx.drawImage(mask, 0, 0, w, h);
+        tctx.globalCompositeOperation = 'source-in';
+        tctx.fillStyle = color;
+        tctx.fillRect(0, 0, w, h);
+
+        ctx.drawImage(tinted, 0, 0);
+        painted = true;
+    }
+
+    return painted ? canvas : null;
+}
+
+async function buildGroupHighlights() {
+    const result = {};
+    for (const group of (props.environment.active_zone_groups || [])) {
+        const canvas = await buildGroupHighlight(group);
+        if (canvas) result[group.id] = canvas;
+    }
+    groupHighlights.value = result;
+}
 
 function setApplying(value) {
     isApplying.value = value;
@@ -389,7 +497,86 @@ function drawTextureWithPerspective(ctx, tiledCanvas, pts, width, height, subdiv
     }
 }
 
-async function composeTextureWithMask(textureUrl, maskUrl, baseImg, width, height, scale = 1, opacity = 1, rotation = 0, perspectivePoints = null, tileOffsetX = 0, tileOffsetY = 0, microRotation = 0) {
+// Construye una "super-baldosa" NxN a partir de la textura para romper la sensación
+// de patrón web. Cada celda se voltea (espejo H/V) de forma determinista y recibe una
+// ligera variación de brillo, de modo que la repetición macro pasa a ser N× más larga
+// y el ojo no reconoce la rejilla. Como la textura es tileable, los espejos preservan
+// las costuras (los bordes opuestos coinciden), así que no aparecen cortes.
+function buildVariedTile(texture, tileW, tileH, seed, grid = 3) {
+    const cols = grid;
+    const rows = grid;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.floor(tileW * cols));
+    canvas.height = Math.max(1, Math.floor(tileH * rows));
+
+    const ctx = canvas.getContext('2d');
+
+    for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+            const s = seed + (r * cols + c) * 97;
+            const flipX = seededRandom(s) > 0.5;
+            const flipY = seededRandom(s + 1) > 0.5;
+            // Variación de luminosidad ±5% para que dos celdas iguales no se lean idénticas.
+            const bright = (seededRandom(s + 2) - 0.5) * 0.10;
+
+            const x = c * tileW;
+            const y = r * tileH;
+
+            ctx.save();
+            ctx.translate(x + (flipX ? tileW : 0), y + (flipY ? tileH : 0));
+            ctx.scale(flipX ? -1 : 1, flipY ? -1 : 1);
+            ctx.drawImage(texture, 0, 0, tileW, tileH);
+            ctx.restore();
+
+            // Overlay de brillo, recortado a la celda.
+            ctx.save();
+            ctx.beginPath();
+            ctx.rect(x, y, tileW, tileH);
+            ctx.clip();
+            ctx.fillStyle = bright >= 0
+                ? `rgba(255,255,255,${bright})`
+                : `rgba(0,0,0,${-bright})`;
+            ctx.fillRect(x, y, tileW, tileH);
+            ctx.restore();
+        }
+    }
+
+    return canvas;
+}
+
+// Book Match: super-baldosa 2×2 con espejos alineados (H, V y H+V) para lograr el
+// veteado simétrico tipo "libro abierto" / mariposa. A diferencia de buildVariedTile,
+// los espejos son deterministas y colindantes, de modo que el dibujo hace "match" en
+// las costuras y se forma la simetría en ambos ejes.
+//   [ original | espejo-H ]
+//   [ espejo-V | espejo-HV]
+function buildBookMatchTile(texture, tileW, tileH) {
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.floor(tileW * 2));
+    canvas.height = Math.max(1, Math.floor(tileH * 2));
+
+    const ctx = canvas.getContext('2d');
+
+    for (let r = 0; r < 2; r++) {
+        for (let c = 0; c < 2; c++) {
+            const flipX = c === 1;
+            const flipY = r === 1;
+            const x = c * tileW;
+            const y = r * tileH;
+
+            ctx.save();
+            ctx.translate(x + (flipX ? tileW : 0), y + (flipY ? tileH : 0));
+            ctx.scale(flipX ? -1 : 1, flipY ? -1 : 1);
+            ctx.drawImage(texture, 0, 0, tileW, tileH);
+            ctx.restore();
+        }
+    }
+
+    return canvas;
+}
+
+async function composeTextureWithMask(textureUrl, maskUrl, baseImg, width, height, scale = 1, opacity = 1, rotation = 0, perspectivePoints = null, tileOffsetX = 0, tileOffsetY = 0, microRotation = 0, seed = 0, bookMatch = false) {
     const texture = await loadImage(textureUrl);
     const mask = await loadImage(maskUrl);
 
@@ -405,13 +592,15 @@ async function composeTextureWithMask(textureUrl, maskUrl, baseImg, width, heigh
     const safeOpacity = Number(opacity || 1);
     const totalRotation = Number(rotation || 0) + Number(microRotation || 0);
 
-    // Build the tiled pattern at the requested scale (flat — no rotation in the tile itself)
-    const patternCanvas = document.createElement('canvas');
-    patternCanvas.width = Math.max(1, texture.width * safeScale);
-    patternCanvas.height = Math.max(1, texture.height * safeScale);
-
-    const patternCtx = patternCanvas.getContext('2d');
-    patternCtx.drawImage(texture, 0, 0, patternCanvas.width, patternCanvas.height);
+    // Build the tiled pattern at the requested scale.
+    // - Book Match ON → super-baldosa 2×2 con espejos alineados (veteado simétrico).
+    // - Book Match OFF → super-baldosa 3×3 con volteos aleatorios y variación de brillo,
+    //   para que la repetición no se lea como un patrón web (ver buildVariedTile).
+    const tileW = Math.max(1, texture.width * safeScale);
+    const tileH = Math.max(1, texture.height * safeScale);
+    const patternCanvas = bookMatch
+        ? buildBookMatchTile(texture, tileW, tileH)
+        : buildVariedTile(texture, tileW, tileH, seed);
 
     // Rotation and offset are applied together via setTransform so the entire tiling
     // grid rotates as a unit — tiles stay seamless regardless of angle.
@@ -557,7 +746,9 @@ async function buildRenderedZones() {
                 : null,
             tileOffsetX,
             tileOffsetY,
-            microRotation
+            microRotation,
+            seed,
+            selection.bookMatch === true
         );
 
         if (!image) continue;
@@ -727,6 +918,7 @@ watch(
         setApplying(true);
 
         await loadBaseImages();
+        await buildGroupHighlights();
         await renderZonesInstant();
         await refreshCanvas();
 
@@ -742,6 +934,7 @@ onMounted(async () => {
     grainImage.value = await generateGrainImage();
 
     await loadBaseImages();
+    await buildGroupHighlights();
     await renderZonesInstant();
     await refreshCanvas();
 
@@ -763,6 +956,7 @@ onBeforeUnmount(() => {
         resizeObserver.disconnect();
     }
 
+    stopHighlightPulse();
     window.removeEventListener('resize', updateContainerSize);
 });
 </script>

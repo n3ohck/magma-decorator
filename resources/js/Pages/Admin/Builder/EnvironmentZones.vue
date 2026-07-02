@@ -147,6 +147,17 @@
                         <span class="text-white/40">Opacidad:</span>
                         {{ previewItem.default_opacity }}
                     </p>
+                    <p class="flex items-center gap-2">
+                        <span class="text-white/40">Book Match:</span>
+                        <span
+                            class="rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider"
+                            :class="previewItem.default_book_match
+                                ? 'bg-[#CC1A1A]/20 text-[#CC1A1A]'
+                                : 'bg-white/8 text-white/40'"
+                        >
+                            {{ previewItem.default_book_match ? 'Activado' : 'Desactivado' }}
+                        </span>
+                    </p>
                 </div>
             </aside>
         </div>
@@ -254,6 +265,11 @@
                     <div class="flex items-center gap-3 pt-8">
                         <input v-model="form.supports_perspective" type="checkbox" class="h-5 w-5" />
                         <label class="text-sm text-white/80">Soporta perspectiva avanzada</label>
+                    </div>
+
+                    <div class="flex items-center gap-3 md:pt-8">
+                        <input v-model="form.default_book_match" type="checkbox" class="h-5 w-5" />
+                        <label class="text-sm text-white/80">Book Match por defecto (espejo simétrico)</label>
                     </div>
 
                     <!-- Editor de máscara (polígono + SAM) -->
@@ -475,6 +491,7 @@ const form = useForm({
     default_texture_rotation: 0,
     default_opacity: 1,
     supports_perspective: false,
+    default_book_match: false,
     perspective_points: '',
     sam_mask_path: '',
     is_active: true,
@@ -506,6 +523,7 @@ function resetForm() {
     form.default_texture_rotation = 0;
     form.default_opacity = 1;
     form.supports_perspective = false;
+    form.default_book_match = false;
     form.perspective_points = '';
     form.is_active = true;
     form.sort_order = 0;
@@ -539,6 +557,7 @@ function openEdit(item) {
     form.default_texture_rotation = item.default_texture_rotation || 0;
     form.default_opacity = item.default_opacity || 1;
     form.supports_perspective = Boolean(item.supports_perspective);
+    form.default_book_match = Boolean(item.default_book_match);
     form.perspective_points = item.perspective_points ? JSON.stringify(item.perspective_points, null, 2) : '';
     form.sam_mask_path = '';
     form.is_active = Boolean(item.is_active);
@@ -561,6 +580,7 @@ function submit() {
     fd.append('default_texture_rotation', form.default_texture_rotation ?? 0);
     fd.append('default_opacity',        form.default_opacity ?? 1);
     fd.append('supports_perspective',   form.supports_perspective ? '1' : '0');
+    fd.append('default_book_match',     form.default_book_match ? '1' : '0');
     fd.append('is_active',              form.is_active ? '1' : '0');
     fd.append('sort_order',             form.sort_order ?? 0);
     fd.append('remove_mask_image',      form.remove_mask_image ? '1' : '0');
