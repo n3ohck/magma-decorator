@@ -553,39 +553,62 @@ function buildVariedTile(texture, tileW, tileH, seed, grid = 3) {
 //
 // Como el bbox se calcula sobre la unión de las máscaras del grupo, todas las zonas del
 // muro comparten el mismo eje y escala, así que juntas forman UNA mariposa continua.
-function drawBookMatchAuto(ctx, texture, bbox, opacity = 1) {
+function drawBookMatchAuto(ctx, texture, bbox, opacity = 1, mode = 'two') {
     const cx = (bbox.minX + bbox.maxX) / 2;
     const cy = (bbox.minY + bbox.maxY) / 2;
-    const qw = (bbox.maxX - bbox.minX) / 2;
-    const qh = (bbox.maxY - bbox.minY) / 2;
+    const halfW = (bbox.maxX - bbox.minX) / 2;
+    const halfH = (bbox.maxY - bbox.minY) / 2;
 
-    if (qw <= 0 || qh <= 0) return;
-
-    // Escala uniforme para que una losa cubra un cuadrante (cover, sin deformar).
-    const s = Math.max(qw / texture.width, qh / texture.height);
-    const dw = texture.width * s;
-    const dh = texture.height * s;
-
-    const quad = (flipX, flipY) => {
-        ctx.save();
-        // Recorta al cuadrante correspondiente (en espacio de dispositivo).
-        ctx.beginPath();
-        ctx.rect(flipX ? cx : cx - qw, flipY ? cy : cy - qh, qw, qh);
-        ctx.clip();
-        // Espejo respecto al centro del muro.
-        ctx.translate(flipX ? 2 * cx : 0, flipY ? 2 * cy : 0);
-        ctx.scale(flipX ? -1 : 1, flipY ? -1 : 1);
-        // Losa base (orientación sup-izq): esquina inferior-derecha anclada en (cx, cy).
-        ctx.drawImage(texture, cx - dw, cy - dh, dw, dh);
-        ctx.restore();
-    };
+    if (halfW <= 0 || halfH <= 0) return;
 
     ctx.save();
     ctx.globalAlpha = opacity;
-    quad(false, false); // sup-izq
-    quad(true, false);  // sup-der (espejo H)
-    quad(false, true);  // inf-izq (espejo V)
-    quad(true, true);   // inf-der (espejo H+V)
+
+    if (mode === 'four') {
+        // 4 vías: mariposa/diamante. 1 losa por cuadrante (cover), espejo H y V.
+        const s = Math.max(halfW / texture.width, halfH / texture.height);
+        const dw = texture.width * s;
+        const dh = texture.height * s;
+
+        const quad = (flipX, flipY) => {
+            ctx.save();
+            ctx.beginPath();
+            ctx.rect(flipX ? cx : cx - halfW, flipY ? cy : cy - halfH, halfW, halfH);
+            ctx.clip();
+            ctx.translate(flipX ? 2 * cx : 0, flipY ? 2 * cy : 0);
+            ctx.scale(flipX ? -1 : 1, flipY ? -1 : 1);
+            // Losa base (sup-izq): esquina inferior-derecha anclada en (cx, cy).
+            ctx.drawImage(texture, cx - dw, cy - dh, dw, dh);
+            ctx.restore();
+        };
+
+        quad(false, false);
+        quad(true, false);
+        quad(false, true);
+        quad(true, true);
+    } else {
+        // 2 vías: espejo sólo izquierda↔derecha (spine vertical), losa a altura completa.
+        // El veteado fluye natural de arriba a abajo, como una losa real abierta en libro.
+        const fullH = halfH * 2;
+        const s = Math.max(halfW / texture.width, fullH / texture.height);
+        const dw = texture.width * s;
+        const dh = texture.height * s;
+
+        const half = (flipX) => {
+            ctx.save();
+            ctx.beginPath();
+            ctx.rect(flipX ? cx : cx - halfW, cy - halfH, halfW, fullH);
+            ctx.clip();
+            if (flipX) { ctx.translate(2 * cx, 0); ctx.scale(-1, 1); }
+            // Losa anclada: borde derecho en cx, centrada verticalmente en el muro.
+            ctx.drawImage(texture, cx - dw, cy - dh / 2, dw, dh);
+            ctx.restore();
+        };
+
+        half(false); // izquierda
+        half(true);  // derecha (espejo H)
+    }
+
     ctx.restore();
 }
 
@@ -664,7 +687,7 @@ async function getBookMatchBBox(zone) {
     return union;
 }
 
-async function composeTextureWithMask(textureUrl, maskUrl, baseImg, width, height, scale = 1, opacity = 1, rotation = 0, perspectivePoints = null, tileOffsetX = 0, tileOffsetY = 0, microRotation = 0, seed = 0, bookMatch = false, bookMatchBBox = null) {
+async function composeTextureWithMask(textureUrl, maskUrl, baseImg, width, height, scale = 1, opacity = 1, rotation = 0, perspectivePoints = null, tileOffsetX = 0, tileOffsetY = 0, microRotation = 0, seed = 0, bookMatch = false, bookMatchBBox = null, bookMatchMode = 'two') {
     const texture = await loadImage(textureUrl);
     const mask = await loadImage(maskUrl);
 
@@ -684,7 +707,7 @@ async function composeTextureWithMask(textureUrl, maskUrl, baseImg, width, heigh
         // Book Match: una sola mariposa 4 vías ajustada al muro completo. Ignora la escala
         // manual (auto-ajuste a 1 losa por cuadrante) y el tiling aleatorio, para lograr la
         // simetría limpia de las referencias.
-        drawBookMatchAuto(ctx, texture, bookMatchBBox, safeOpacity);
+        drawBookMatchAuto(ctx, texture, bookMatchBBox, safeOpacity, bookMatchMode);
     } else {
         // Tiling normal con super-baldosa 3×3 (volteos aleatorios + variación de brillo)
         // para que la repetición no se lea como un patrón web (ver buildVariedTile).
@@ -846,7 +869,8 @@ async function buildRenderedZones() {
             microRotation,
             seed,
             bookMatch,
-            bookMatchBBox
+            bookMatchBBox,
+            selection.bookMatchMode || 'two'
         );
 
         if (!image) continue;

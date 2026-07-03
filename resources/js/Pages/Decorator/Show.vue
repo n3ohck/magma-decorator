@@ -260,6 +260,32 @@
                                 </button>
                             </div>
 
+                            <!-- Selector de modo, solo con Book Match activo -->
+                            <div v-if="currentZoneMaterial.bookMatch" class="flex items-center gap-1.5">
+                                <button
+                                    type="button"
+                                    class="flex-1 h-8 border text-[10px] font-semibold uppercase tracking-[0.15em] transition disabled:opacity-30"
+                                    :class="(currentZoneMaterial.bookMatchMode || 'two') === 'two'
+                                        ? 'border-[#CC1A1A] bg-[#CC1A1A]/10 text-white'
+                                        : 'border-white/12 bg-white/[0.03] text-white/50 hover:text-white'"
+                                    :disabled="isApplyingMaterial"
+                                    @click="setBookMatchMode('two')"
+                                >
+                                    2 vías · Vertical
+                                </button>
+                                <button
+                                    type="button"
+                                    class="flex-1 h-8 border text-[10px] font-semibold uppercase tracking-[0.15em] transition disabled:opacity-30"
+                                    :class="(currentZoneMaterial.bookMatchMode || 'two') === 'four'
+                                        ? 'border-[#CC1A1A] bg-[#CC1A1A]/10 text-white'
+                                        : 'border-white/12 bg-white/[0.03] text-white/50 hover:text-white'"
+                                    :disabled="isApplyingMaterial"
+                                    @click="setBookMatchMode('four')"
+                                >
+                                    4 vías · Diamante
+                                </button>
+                            </div>
+
                             <button
                                 type="button"
                                 class="text-[10px] uppercase tracking-[0.2em] text-white/30 hover:text-white/60 transition disabled:opacity-30"
@@ -412,6 +438,7 @@ function buildZoneEntry(zone, material) {
         rotation:  Number(material.default_rotation || zone.default_texture_rotation || 0),
         opacity:   Number(material.default_opacity  || zone.default_opacity          || 1),
         bookMatch: Boolean(zone.default_book_match),
+        bookMatchMode: 'two',   // '' 'two' = spine vertical · 'four' = mariposa/diamante
     };
 }
 
@@ -479,6 +506,7 @@ function resetAdjustments() {
             scale: INITIAL_TEXTURE_SCALE,
             rotation: Number(material.default_rotation || zone.default_texture_rotation || 0),
             bookMatch: false,
+            bookMatchMode: 'two',
         };
     }
     selectedMaterials.value = next;
@@ -495,6 +523,20 @@ function toggleBookMatch() {
     const next = { ...selectedMaterials.value };
     for (const id of ids) {
         if (next[id]) next[id] = { ...next[id], bookMatch: nextVal };
+    }
+    selectedMaterials.value = next;
+}
+
+// Modo de espejo del book match ('two' = spine vertical · 'four' = diamante).
+// Se aplica a todo el grupo, igual que el toggle.
+function setBookMatchMode(mode) {
+    if (!currentZoneMaterial.value) return;
+    const ids = adjustmentTargetZoneIds.value;
+    if (!ids.length) return;
+
+    const next = { ...selectedMaterials.value };
+    for (const id of ids) {
+        if (next[id]) next[id] = { ...next[id], bookMatchMode: mode };
     }
     selectedMaterials.value = next;
 }
