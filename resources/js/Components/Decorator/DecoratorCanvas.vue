@@ -564,6 +564,10 @@ function drawBookMatchAuto(ctx, texture, bbox, opacity = 1, mode = 'two') {
     ctx.save();
     ctx.globalAlpha = opacity;
 
+    // Traslape de 1px hacia el eje del espejo: como los lados son mirror uno del otro,
+    // solaparlos 1px elimina la hairline fina en la costura sin romper la simetría.
+    const bleed = 1;
+
     if (mode === 'four') {
         // 4 vías: mariposa/diamante. 1 losa por cuadrante (cover), espejo H y V.
         const s = Math.max(halfW / texture.width, halfH / texture.height);
@@ -573,7 +577,12 @@ function drawBookMatchAuto(ctx, texture, bbox, opacity = 1, mode = 'two') {
         const quad = (flipX, flipY) => {
             ctx.save();
             ctx.beginPath();
-            ctx.rect(flipX ? cx : cx - halfW, flipY ? cy : cy - halfH, halfW, halfH);
+            ctx.rect(
+                flipX ? cx - bleed : cx - halfW,
+                flipY ? cy - bleed : cy - halfH,
+                halfW + bleed,
+                halfH + bleed,
+            );
             ctx.clip();
             ctx.translate(flipX ? 2 * cx : 0, flipY ? 2 * cy : 0);
             ctx.scale(flipX ? -1 : 1, flipY ? -1 : 1);
@@ -597,7 +606,7 @@ function drawBookMatchAuto(ctx, texture, bbox, opacity = 1, mode = 'two') {
         const half = (flipX) => {
             ctx.save();
             ctx.beginPath();
-            ctx.rect(flipX ? cx : cx - halfW, cy - halfH, halfW, fullH);
+            ctx.rect(flipX ? cx - bleed : cx - halfW, cy - halfH, halfW + bleed, fullH);
             ctx.clip();
             if (flipX) { ctx.translate(2 * cx, 0); ctx.scale(-1, 1); }
             // Losa anclada: borde derecho en cx, centrada verticalmente en el muro.
@@ -761,11 +770,26 @@ async function composeTextureWithMask(textureUrl, maskUrl, baseImg, width, heigh
         ctx.globalCompositeOperation = 'source-over';
     }
 
-    // Clip to zone mask with feathered edges (blur softens the hard mask boundary
-    // so the material integrates into the scene instead of cutting sharply).
-    ctx.filter = 'blur(2.5px)';
+    // Clip to zone mask. Dilatamos ligeramente la máscara (varias copias desplazadas)
+    // para que zonas contiguas de un mismo muro se SOLAPEN y no dejen una costura —una
+    // línea clara del fondo— entre ellas. Luego un feather suave integra el borde exterior
+    // en la escena sin el corte duro tipo "sticker".
+    const dilate = Math.max(1, Math.round(width * 0.0012));
+    const dilatedMask = document.createElement('canvas');
+    dilatedMask.width = width;
+    dilatedMask.height = height;
+    const dmCtx = dilatedMask.getContext('2d');
+    const dmOffsets = [
+        [0, 0], [dilate, 0], [-dilate, 0], [0, dilate], [0, -dilate],
+        [dilate, dilate], [-dilate, -dilate], [dilate, -dilate], [-dilate, dilate],
+    ];
+    for (const [ox, oy] of dmOffsets) {
+        dmCtx.drawImage(mask, ox, oy, width, height);
+    }
+
+    ctx.filter = 'blur(1.5px)';
     ctx.globalCompositeOperation = 'destination-in';
-    ctx.drawImage(mask, 0, 0, width, height);
+    ctx.drawImage(dilatedMask, 0, 0, width, height);
     ctx.filter = 'none';
 
     // Vignette: subtle darkening at zone edges gives depth and avoids the
