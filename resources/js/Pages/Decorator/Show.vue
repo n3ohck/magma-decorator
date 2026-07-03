@@ -214,7 +214,7 @@
                                 <input
                                     type="range" min="0.2" max="6" step="0.1"
                                     :value="currentZoneMaterial.scale"
-                                    :disabled="isApplyingMaterial"
+                                    :disabled="isApplyingMaterial || currentZoneMaterial.bookMatch"
                                     class="w-full h-px accent-[#CC1A1A] disabled:opacity-30"
                                     @input="updateAdjustment('scale', Number($event.target.value))"
                                 />
@@ -230,7 +230,7 @@
                                 <input
                                     type="range" min="0" max="360" step="1"
                                     :value="currentZoneMaterial.rotation"
-                                    :disabled="isApplyingMaterial"
+                                    :disabled="isApplyingMaterial || currentZoneMaterial.bookMatch"
                                     class="w-full h-px accent-[#CC1A1A] disabled:opacity-30"
                                     @input="updateAdjustment('rotation', Number($event.target.value))"
                                 />
@@ -241,7 +241,7 @@
                                 <div class="min-w-0 pr-3">
                                     <span class="text-[10px] uppercase tracking-[0.2em] text-white/40">Book Match</span>
                                     <p class="text-[10px] text-white/25 mt-0.5 leading-tight">
-                                        Espeja la textura para un veteado simétrico.
+                                        Espejo simétrico auto-ajustado al muro. Aplica a todo el grupo.
                                     </p>
                                 </div>
                                 <button
@@ -484,15 +484,18 @@ function resetAdjustments() {
     selectedMaterials.value = next;
 }
 
-// Book Match aplica SÓLO a la capa seleccionada (individual), aunque pertenezca a un grupo.
+// Book Match (auto): si la zona pertenece a un grupo, se aplica a TODO el muro (grupo)
+// con un eje de espejo común; si es zona suelta, sólo a esa capa.
 function toggleBookMatch() {
-    if (!selectedZone.value || !currentZoneMaterial.value) return;
-    const zoneId = selectedZone.value.id;
-    const entry = selectedMaterials.value[zoneId];
-    if (!entry) return;
-    selectedMaterials.value = {
-        ...selectedMaterials.value,
-        [zoneId]: { ...entry, bookMatch: !entry.bookMatch },
-    };
+    if (!currentZoneMaterial.value) return;
+    const ids = adjustmentTargetZoneIds.value;
+    if (!ids.length) return;
+
+    const nextVal = !currentZoneMaterial.value.bookMatch;
+    const next = { ...selectedMaterials.value };
+    for (const id of ids) {
+        if (next[id]) next[id] = { ...next[id], bookMatch: nextVal };
+    }
+    selectedMaterials.value = next;
 }
 </script>

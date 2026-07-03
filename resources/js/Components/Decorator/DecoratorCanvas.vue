@@ -545,38 +545,126 @@ function buildVariedTile(texture, tileW, tileH, seed, grid = 3) {
     return canvas;
 }
 
-// Book Match: super-baldosa 2×2 con espejos alineados (H, V y H+V) para lograr el
-// veteado simétrico tipo "libro abierto" / mariposa. A diferencia de buildVariedTile,
-// los espejos son deterministas y colindantes, de modo que el dibujo hace "match" en
-// las costuras y se forma la simetría en ambos ejes.
-//   [ original | espejo-H ]
-//   [ espejo-V | espejo-HV]
-function buildBookMatchTile(texture, tileW, tileH) {
-    const canvas = document.createElement('canvas');
-    canvas.width = Math.max(1, Math.floor(tileW * 2));
-    canvas.height = Math.max(1, Math.floor(tileH * 2));
+// Book Match "auto": una sola mariposa (4 vías) centrada y ajustada al muro completo.
+// Divide el bounding-box del muro (bbox, en coordenadas del canvas) en 4 cuadrantes y
+// coloca una losa por cuadrante, escalada uniformemente para cubrirlo (cover, sin
+// deformar), con el eje de espejo en el centro del muro. Los bordes colindantes de las
+// losas coinciden → veteado simétrico tipo "libro abierto" en ambos ejes.
+//
+// Como el bbox se calcula sobre la unión de las máscaras del grupo, todas las zonas del
+// muro comparten el mismo eje y escala, así que juntas forman UNA mariposa continua.
+function drawBookMatchAuto(ctx, texture, bbox, opacity = 1) {
+    const cx = (bbox.minX + bbox.maxX) / 2;
+    const cy = (bbox.minY + bbox.maxY) / 2;
+    const qw = (bbox.maxX - bbox.minX) / 2;
+    const qh = (bbox.maxY - bbox.minY) / 2;
 
-    const ctx = canvas.getContext('2d');
+    if (qw <= 0 || qh <= 0) return;
 
-    for (let r = 0; r < 2; r++) {
-        for (let c = 0; c < 2; c++) {
-            const flipX = c === 1;
-            const flipY = r === 1;
-            const x = c * tileW;
-            const y = r * tileH;
+    // Escala uniforme para que una losa cubra un cuadrante (cover, sin deformar).
+    const s = Math.max(qw / texture.width, qh / texture.height);
+    const dw = texture.width * s;
+    const dh = texture.height * s;
 
-            ctx.save();
-            ctx.translate(x + (flipX ? tileW : 0), y + (flipY ? tileH : 0));
-            ctx.scale(flipX ? -1 : 1, flipY ? -1 : 1);
-            ctx.drawImage(texture, 0, 0, tileW, tileH);
-            ctx.restore();
+    const quad = (flipX, flipY) => {
+        ctx.save();
+        // Recorta al cuadrante correspondiente (en espacio de dispositivo).
+        ctx.beginPath();
+        ctx.rect(flipX ? cx : cx - qw, flipY ? cy : cy - qh, qw, qh);
+        ctx.clip();
+        // Espejo respecto al centro del muro.
+        ctx.translate(flipX ? 2 * cx : 0, flipY ? 2 * cy : 0);
+        ctx.scale(flipX ? -1 : 1, flipY ? -1 : 1);
+        // Losa base (orientación sup-izq): esquina inferior-derecha anclada en (cx, cy).
+        ctx.drawImage(texture, cx - dw, cy - dh, dw, dh);
+        ctx.restore();
+    };
+
+    ctx.save();
+    ctx.globalAlpha = opacity;
+    quad(false, false); // sup-izq
+    quad(true, false);  // sup-der (espejo H)
+    quad(false, true);  // inf-izq (espejo V)
+    quad(true, true);   // inf-der (espejo H+V)
+    ctx.restore();
+}
+
+// Bounding-box (en coordenadas del canvas) del área opaca de una máscara.
+// Escanea a resolución reducida para ser barato.
+async function computeMaskBBox(maskUrl, width, height) {
+    const mask = await loadImage(maskUrl);
+    if (!mask) return null;
+
+    const maxDim = 320;
+    const ratio = Math.min(maxDim / width, maxDim / height, 1);
+    const w = Math.max(1, Math.round(width * ratio));
+    const h = Math.max(1, Math.round(height * ratio));
+
+    const c = document.createElement('canvas');
+    c.width = w;
+    c.height = h;
+    const cc = c.getContext('2d');
+    cc.drawImage(mask, 0, 0, w, h);
+    const data = cc.getImageData(0, 0, w, h).data;
+
+    let minX = w, minY = h, maxX = -1, maxY = -1;
+    for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+            if (data[(y * w + x) * 4 + 3] > 10) {
+                if (x < minX) minX = x;
+                if (x > maxX) maxX = x;
+                if (y < minY) minY = y;
+                if (y > maxY) maxY = y;
+            }
         }
     }
 
-    return canvas;
+    if (maxX < 0) return null;
+
+    return {
+        minX: minX / ratio,
+        minY: minY / ratio,
+        maxX: (maxX + 1) / ratio,
+        maxY: (maxY + 1) / ratio,
+    };
 }
 
-async function composeTextureWithMask(textureUrl, maskUrl, baseImg, width, height, scale = 1, opacity = 1, rotation = 0, perspectivePoints = null, tileOffsetX = 0, tileOffsetY = 0, microRotation = 0, seed = 0, bookMatch = false) {
+// Cache de bbox para book match, por grupo (eje común de muro) o por zona suelta.
+let bookMatchBBoxCache = {};
+
+// bbox a usar para el book match de una zona:
+//   - Si pertenece a un grupo → unión de las máscaras de TODAS sus zonas (muro completo).
+//   - Si es zona suelta → su propia máscara.
+async function getBookMatchBBox(zone) {
+    const group = (props.environment.active_zone_groups || []).find(
+        (g) => (g.active_zones || g.zones || []).some((z) => z.id === zone.id),
+    );
+
+    const key = group ? `g${group.id}` : `z${zone.id}`;
+    if (bookMatchBBoxCache[key]) return bookMatchBBoxCache[key];
+
+    const zonesForBBox = group ? (group.active_zones || group.zones || []) : [zone];
+
+    let union = null;
+    for (const z of zonesForBBox) {
+        if (!z.mask_image_url) continue;
+        const bb = await computeMaskBBox(z.mask_image_url, canvasWidth.value, canvasHeight.value);
+        if (!bb) continue;
+        union = union
+            ? {
+                minX: Math.min(union.minX, bb.minX),
+                minY: Math.min(union.minY, bb.minY),
+                maxX: Math.max(union.maxX, bb.maxX),
+                maxY: Math.max(union.maxY, bb.maxY),
+            }
+            : bb;
+    }
+
+    bookMatchBBoxCache[key] = union;
+    return union;
+}
+
+async function composeTextureWithMask(textureUrl, maskUrl, baseImg, width, height, scale = 1, opacity = 1, rotation = 0, perspectivePoints = null, tileOffsetX = 0, tileOffsetY = 0, microRotation = 0, seed = 0, bookMatch = false, bookMatchBBox = null) {
     const texture = await loadImage(textureUrl);
     const mask = await loadImage(maskUrl);
 
@@ -590,50 +678,53 @@ async function composeTextureWithMask(textureUrl, maskUrl, baseImg, width, heigh
 
     const safeScale = Number(scale || 1);
     const safeOpacity = Number(opacity || 1);
-    const totalRotation = Number(rotation || 0) + Number(microRotation || 0);
 
-    // Build the tiled pattern at the requested scale.
-    // - Book Match ON → super-baldosa 2×2 con espejos alineados (veteado simétrico).
-    // - Book Match OFF → super-baldosa 3×3 con volteos aleatorios y variación de brillo,
-    //   para que la repetición no se lea como un patrón web (ver buildVariedTile).
-    const tileW = Math.max(1, texture.width * safeScale);
-    const tileH = Math.max(1, texture.height * safeScale);
-    const patternCanvas = bookMatch
-        ? buildBookMatchTile(texture, tileW, tileH)
-        : buildVariedTile(texture, tileW, tileH, seed);
-
-    // Rotation and offset are applied together via setTransform so the entire tiling
-    // grid rotates as a unit — tiles stay seamless regardless of angle.
-    const offsetX = tileOffsetX * patternCanvas.width;
-    const offsetY = tileOffsetY * patternCanvas.height;
-    const rad = (totalRotation * Math.PI) / 180;
-    const cos = Math.cos(rad);
-    const sin = Math.sin(rad);
-    // DOMMatrix(a,b,c,d,e,f): x' = a*x + c*y + e, y' = b*x + d*y + f
-    const offsetMatrix = new DOMMatrix([cos, sin, -sin, cos, offsetX, offsetY]);
-
-    // Draw texture — flat tile or perspective-warped
-    if (perspectivePoints && perspectivePoints.length === 4) {
-        // Pre-tile to full canvas size with offset applied, then warp via grid subdivision
-        const tiledCanvas = document.createElement('canvas');
-        tiledCanvas.width = width;
-        tiledCanvas.height = height;
-        const tiledCtx = tiledCanvas.getContext('2d');
-        const tiledPattern = tiledCtx.createPattern(patternCanvas, 'repeat');
-        tiledPattern.setTransform(offsetMatrix);
-        tiledCtx.fillStyle = tiledPattern;
-        tiledCtx.fillRect(0, 0, width, height);
-
-        drawTextureWithPerspective(ctx, tiledCanvas, perspectivePoints, width, height);
+    // Draw texture — book match auto, or flat/perspective tiling.
+    if (bookMatch && bookMatchBBox) {
+        // Book Match: una sola mariposa 4 vías ajustada al muro completo. Ignora la escala
+        // manual (auto-ajuste a 1 losa por cuadrante) y el tiling aleatorio, para lograr la
+        // simetría limpia de las referencias.
+        drawBookMatchAuto(ctx, texture, bookMatchBBox, safeOpacity);
     } else {
-        const pattern = ctx.createPattern(patternCanvas, 'repeat');
-        pattern.setTransform(offsetMatrix);
+        // Tiling normal con super-baldosa 3×3 (volteos aleatorios + variación de brillo)
+        // para que la repetición no se lea como un patrón web (ver buildVariedTile).
+        const totalRotation = Number(rotation || 0) + Number(microRotation || 0);
+        const tileW = Math.max(1, texture.width * safeScale);
+        const tileH = Math.max(1, texture.height * safeScale);
+        const patternCanvas = buildVariedTile(texture, tileW, tileH, seed);
 
-        ctx.save();
-        ctx.globalAlpha = safeOpacity;
-        ctx.fillStyle = pattern;
-        ctx.fillRect(0, 0, width, height);
-        ctx.restore();
+        // Rotation and offset are applied together via setTransform so the entire tiling
+        // grid rotates as a unit — tiles stay seamless regardless of angle.
+        const offsetX = tileOffsetX * patternCanvas.width;
+        const offsetY = tileOffsetY * patternCanvas.height;
+        const rad = (totalRotation * Math.PI) / 180;
+        const cos = Math.cos(rad);
+        const sin = Math.sin(rad);
+        // DOMMatrix(a,b,c,d,e,f): x' = a*x + c*y + e, y' = b*x + d*y + f
+        const offsetMatrix = new DOMMatrix([cos, sin, -sin, cos, offsetX, offsetY]);
+
+        if (perspectivePoints && perspectivePoints.length === 4) {
+            // Pre-tile to full canvas size with offset applied, then warp via grid subdivision
+            const tiledCanvas = document.createElement('canvas');
+            tiledCanvas.width = width;
+            tiledCanvas.height = height;
+            const tiledCtx = tiledCanvas.getContext('2d');
+            const tiledPattern = tiledCtx.createPattern(patternCanvas, 'repeat');
+            tiledPattern.setTransform(offsetMatrix);
+            tiledCtx.fillStyle = tiledPattern;
+            tiledCtx.fillRect(0, 0, width, height);
+
+            drawTextureWithPerspective(ctx, tiledCanvas, perspectivePoints, width, height);
+        } else {
+            const pattern = ctx.createPattern(patternCanvas, 'repeat');
+            pattern.setTransform(offsetMatrix);
+
+            ctx.save();
+            ctx.globalAlpha = safeOpacity;
+            ctx.fillStyle = pattern;
+            ctx.fillRect(0, 0, width, height);
+            ctx.restore();
+        }
     }
 
     // Bake surface lighting: multiply the base image shading onto the texture.
@@ -732,6 +823,12 @@ async function buildRenderedZones() {
         const tileOffsetY = seededRandom(seed + 7);
         const microRotation = (seededRandom(seed + 13) - 0.5) * 6; // ±3°
 
+        const bookMatch = selection.bookMatch === true;
+
+        // Book Match: bbox del muro completo (unión del grupo) o de la zona suelta,
+        // para que el eje de espejo sea común entre las zonas del muro.
+        const bookMatchBBox = bookMatch ? await getBookMatchBBox(zone) : null;
+
         const image = await composeTextureWithMask(
             selection.material.texture_url,
             zone.mask_image_url,
@@ -748,7 +845,8 @@ async function buildRenderedZones() {
             tileOffsetY,
             microRotation,
             seed,
-            selection.bookMatch === true
+            bookMatch,
+            bookMatchBBox
         );
 
         if (!image) continue;
@@ -917,6 +1015,7 @@ watch(
     async () => {
         setApplying(true);
 
+        bookMatchBBoxCache = {};
         await loadBaseImages();
         await buildGroupHighlights();
         await renderZonesInstant();
