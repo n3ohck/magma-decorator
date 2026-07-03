@@ -569,32 +569,37 @@ function drawBookMatchAuto(ctx, texture, bbox, opacity = 1, mode = 'two') {
     const bleed = 1;
 
     if (mode === 'four') {
-        // 4 vías: mariposa/diamante. 1 losa por cuadrante (cover), espejo H y V.
+        // 4 vías: mariposa/diamante. Pre-renderizamos UN cuadrante opaco (la losa cover)
+        // y lo colocamos 4 veces con espejo y un pequeño traslape hacia los ejes. Al dibujar
+        // imágenes completas (sin recorte por cuadrante) no queda hairline ni línea clara en
+        // el eje horizontal/vertical del espejo.
         const s = Math.max(halfW / texture.width, halfH / texture.height);
         const dw = texture.width * s;
         const dh = texture.height * s;
 
-        const quad = (flipX, flipY) => {
+        const qw = Math.ceil(halfW);
+        const qh = Math.ceil(halfH);
+        const q = document.createElement('canvas');
+        q.width = qw;
+        q.height = qh;
+        // Losa anclada en la esquina interior del cuadrante (hacia el centro del muro).
+        q.getContext('2d').drawImage(texture, qw - dw, qh - dh, dw, dh);
+
+        const ov = Math.max(2, bleed + 1); // traslape hacia los ejes
+
+        const placeQuad = (flipX, flipY) => {
             ctx.save();
-            ctx.beginPath();
-            ctx.rect(
-                flipX ? cx - bleed : cx - halfW,
-                flipY ? cy - bleed : cy - halfH,
-                halfW + bleed,
-                halfH + bleed,
-            );
-            ctx.clip();
             ctx.translate(flipX ? 2 * cx : 0, flipY ? 2 * cy : 0);
             ctx.scale(flipX ? -1 : 1, flipY ? -1 : 1);
-            // Losa base (sup-izq): esquina inferior-derecha anclada en (cx, cy).
-            ctx.drawImage(texture, cx - dw, cy - dh, dw, dh);
+            // Cuadrante base (sup-izq), extendido ov px pasando el eje para solapar el vecino.
+            ctx.drawImage(q, cx - halfW, cy - halfH, halfW + ov, halfH + ov);
             ctx.restore();
         };
 
-        quad(false, false);
-        quad(true, false);
-        quad(false, true);
-        quad(true, true);
+        placeQuad(false, false);
+        placeQuad(true, false);
+        placeQuad(false, true);
+        placeQuad(true, true);
     } else {
         // 2 vías: espejo sólo izquierda↔derecha (spine vertical), losa a altura completa.
         // El veteado fluye natural de arriba a abajo, como una losa real abierta en libro.
