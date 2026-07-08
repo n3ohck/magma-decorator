@@ -155,7 +155,7 @@
                                     ? 'bg-white/10 border-white/15 text-white'
                                     : 'bg-transparent border-white/8 text-white/20'"
                             >
-                                2
+                                1
                             </span>
                             <h3
                                 class="text-xs uppercase tracking-[0.25em] font-semibold transition"
