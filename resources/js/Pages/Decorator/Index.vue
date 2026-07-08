@@ -4,7 +4,7 @@
         <!-- Header -->
         <header class="border-b border-white/8 px-6 py-5">
             <div class="max-w-7xl mx-auto flex items-center justify-between">
-                <a href="/" class="shrink-0">
+                <a href="https://magmasuperficies.com" class="shrink-0">
                     <img
                         :src="'/images/magma-logo.png'"
                         alt="Magma Superficies"
@@ -16,7 +16,7 @@
                     </span>
                 </a>
 
-                <a href="/" class="text-white/40 text-xs uppercase tracking-[0.25em] hover:text-white/70 transition">
+                <a href="https://magmasuperficies.com" class="text-white/40 text-xs uppercase tracking-[0.25em] hover:text-white/70 transition">
                     ← Volver al sitio
                 </a>
             </div>
@@ -31,12 +31,8 @@
                 </p>
 
                 <h1 class="mt-4 text-4xl md:text-6xl font-bold text-white leading-tight uppercase tracking-tight">
-                    Diseña tu espacio<br />a tu medida
-                </h1>
-
-                <p class="mt-6 text-xl md:text-2xl text-white/80 max-w-xl leading-snug font-light">
                     Visualiza espacios con <span class="relative font-medium text-white whitespace-nowrap">materiales reales<span class="absolute -bottom-1 left-0 h-px w-full bg-gradient-to-r from-[#CC1A1A] to-transparent"></span></span>.
-                </p>
+                </h1>
 
                 <p class="mt-4 text-sm text-white/40 max-w-xl leading-relaxed">
                     Aplica mármoles, cuarzos, cuarcitas y piedras naturales sobre

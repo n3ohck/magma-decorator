@@ -9,7 +9,7 @@
                 <header class="shrink-0 border-b border-white/8 px-5 py-3 flex items-center justify-between gap-4">
                     <div class="flex items-center gap-4 min-w-0">
                         <!-- Logo -->
-                        <a href="/" class="shrink-0">
+                        <a href="https://magmasuperficies.com" class="shrink-0">
                             <img
                                 :src="'/images/magma-logo.png'"
                                 alt="Magma Superficies"
@@ -31,6 +31,15 @@
                             class="text-[10px] uppercase tracking-[0.25em] text-white/35 hover:text-white/70 transition shrink-0"
                         >
                             ← Ambientes
+                        </a>
+
+                        <div class="h-4 w-px bg-white/10 shrink-0" />
+
+                        <a
+                            href="https://magmasuperficies.com"
+                            class="text-[10px] uppercase tracking-[0.25em] text-white/35 hover:text-white/70 transition shrink-0"
+                        >
+                            ← Volver al sitio
                         </a>
 
                         <div class="h-4 w-px bg-white/10 shrink-0" />
@@ -119,7 +128,7 @@
                 <div class="p-5 flex-1 flex flex-col gap-6">
 
                     <!-- Step 1 -->
-                    <section>
+                    <section style="display: none;">
                         <div class="flex items-center gap-3 mb-3">
                             <span class="h-6 w-6 bg-white/10 border border-white/15 text-white text-xs grid place-items-center font-bold shrink-0">
                                 1
@@ -265,7 +274,7 @@
                                 <button
                                     type="button"
                                     class="flex-1 h-8 border text-[10px] font-semibold uppercase tracking-[0.15em] transition disabled:opacity-30"
-                                    :class="(currentZoneMaterial.bookMatchMode || 'two') === 'two'
+                                    :class="(currentZoneMaterial.bookMatchMode || 'four') === 'two'
                                         ? 'border-[#CC1A1A] bg-[#CC1A1A]/10 text-white'
                                         : 'border-white/12 bg-white/[0.03] text-white/50 hover:text-white'"
                                     :disabled="isApplyingMaterial"
@@ -276,7 +285,7 @@
                                 <button
                                     type="button"
                                     class="flex-1 h-8 border text-[10px] font-semibold uppercase tracking-[0.15em] transition disabled:opacity-30"
-                                    :class="(currentZoneMaterial.bookMatchMode || 'two') === 'four'
+                                    :class="(currentZoneMaterial.bookMatchMode || 'four') === 'four'
                                         ? 'border-[#CC1A1A] bg-[#CC1A1A]/10 text-white'
                                         : 'border-white/12 bg-white/[0.03] text-white/50 hover:text-white'"
                                     :disabled="isApplyingMaterial"
@@ -437,8 +446,8 @@ function buildZoneEntry(zone, material) {
         scale:     INITIAL_TEXTURE_SCALE,
         rotation:  Number(material.default_rotation || zone.default_texture_rotation || 0),
         opacity:   Number(material.default_opacity  || zone.default_opacity          || 1),
-        bookMatch: Boolean(zone.default_book_match),
-        bookMatchMode: 'two',   // '' 'two' = spine vertical · 'four' = mariposa/diamante
+        bookMatch: Boolean(true),
+        bookMatchMode: 'four',   // 'two' = spine vertical · 'four' = mariposa/diamante (default)
     };
 }
 
@@ -506,7 +515,7 @@ function resetAdjustments() {
             scale: INITIAL_TEXTURE_SCALE,
             rotation: Number(material.default_rotation || zone.default_texture_rotation || 0),
             bookMatch: false,
-            bookMatchMode: 'two',
+            bookMatchMode: 'four',
         };
     }
     selectedMaterials.value = next;
