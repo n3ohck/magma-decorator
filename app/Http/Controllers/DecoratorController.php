@@ -29,19 +29,37 @@ class DecoratorController extends Controller
             'activeZoneGroups.activeZones',
         ]);
 
+        // Materiales por categoría. Si el ambiente no usa "todos los materiales",
+        // se limita a los seleccionados en su configuración (tabla environment_material).
+        $allowedIds = $environment->all_materials
+            ? null
+            : $environment->materials()->pluck('materials.id');
+
+        $categories = MaterialCategory::query()
+            ->where('is_active', true)
+            ->with([
+                'materials' => function ($query) use ($allowedIds) {
+                    $query->where('is_active', true);
+
+                    if ($allowedIds !== null) {
+                        $query->whereIn('id', $allowedIds);
+                    }
+
+                    $query->orderBy('sort_order')->orderBy('name');
+                },
+            ])
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->get();
+
+        // Oculta categorías que quedaron sin materiales tras el filtro.
+        if ($allowedIds !== null) {
+            $categories = $categories->filter(fn ($category) => $category->materials->isNotEmpty())->values();
+        }
+
         return Inertia::render('Decorator/Show', [
             'environment' => $environment,
-            'categories' => MaterialCategory::query()
-                ->where('is_active', true)
-                ->with([
-                    'materials' => fn ($query) => $query
-                        ->where('is_active', true)
-                        ->orderBy('sort_order')
-                        ->orderBy('name'),
-                ])
-                ->orderBy('sort_order')
-                ->orderBy('name')
-                ->get(),
+            'categories' => $categories,
             'aiRenderEnabled' => Setting::getBool('ai_render_enabled', true),
         ]);
     }

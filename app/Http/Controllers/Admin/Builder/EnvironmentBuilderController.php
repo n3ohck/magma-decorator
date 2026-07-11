@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin\Builder;
 
 use App\Http\Controllers\Controller;
 use App\Models\Environment;
+use App\Models\MaterialCategory;
 use App\Services\ImageOptimizer;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -14,9 +15,29 @@ class EnvironmentBuilderController extends Controller
 {
     public function index()
     {
+        $items = Environment::query()
+            ->withCount('zones')
+            ->with('materials:id')
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->get();
+
+        // ids planos de materiales seleccionados por ambiente (para el picker)
+        $items->each(function ($environment) {
+            $environment->setAttribute('material_ids', $environment->materials->pluck('id')->values());
+            $environment->unsetRelation('materials');
+        });
+
         return Inertia::render('Admin/Builder/Environments', [
-            'items' => Environment::query()
-                ->withCount('zones')
+            'items' => $items,
+            // Catálogo para el selector de materiales por categoría
+            'categories' => MaterialCategory::query()
+                ->where('is_active', true)
+                ->with(['materials' => fn ($q) => $q
+                    ->where('is_active', true)
+                    ->orderBy('sort_order')
+                    ->orderBy('name')
+                    ->select('id', 'material_category_id', 'name', 'thumbnail_image', 'texture_image')])
                 ->orderBy('sort_order')
                 ->orderBy('name')
                 ->get(),
@@ -37,7 +58,11 @@ class EnvironmentBuilderController extends Controller
             }
         }
 
-        Environment::create($data);
+        $materialIds = $data['material_ids'] ?? [];
+        unset($data['material_ids']);
+
+        $environment = Environment::create($data);
+        $environment->materials()->sync($materialIds);
 
         return back()->with('success', 'Ambiente creado correctamente.');
     }
@@ -64,7 +89,11 @@ class EnvironmentBuilderController extends Controller
             }
         }
 
+        $materialIds = $data['material_ids'] ?? [];
+        unset($data['material_ids']);
+
         $environment->update($data);
+        $environment->materials()->sync($materialIds);
 
         return back()->with('success', 'Ambiente actualizado correctamente.');
     }
@@ -97,6 +126,9 @@ class EnvironmentBuilderController extends Controller
             'canvas_height' => ['nullable', 'integer', 'min:100'],
             'is_featured' => ['nullable', 'boolean'],
             'is_active' => ['nullable', 'boolean'],
+            'all_materials' => ['nullable', 'boolean'],
+            'material_ids' => ['nullable', 'array'],
+            'material_ids.*' => ['integer', 'exists:materials,id'],
             'sort_order' => ['nullable', 'integer', 'min:0'],
             'foreground_overlay_image' => ['nullable', 'image', 'max:51200'],
         ]);

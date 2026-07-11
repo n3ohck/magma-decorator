@@ -23,6 +23,7 @@ class Environment extends Model
         'canvas_height',
         'is_featured',
         'is_active',
+        'all_materials',
         'sort_order',
         'foreground_overlay_image',
     ];
@@ -31,6 +32,7 @@ class Environment extends Model
         'keywords'    => 'array',
         'is_featured' => 'boolean',
         'is_active' => 'boolean',
+        'all_materials' => 'boolean',
         'sort_order' => 'integer',
         'canvas_width' => 'integer',
         'canvas_height' => 'integer',
@@ -72,6 +74,14 @@ class Environment extends Model
     public function designSessions()
     {
         return $this->hasMany(DesignSession::class);
+    }
+
+    /**
+     * Materiales habilitados para este ambiente (cuando all_materials = false).
+     */
+    public function materials()
+    {
+        return $this->belongsToMany(Material::class, 'environment_material');
     }
 
     public function getBaseImageUrlAttribute()

@@ -236,6 +236,85 @@
                         <span class="text-sm text-white/80">Activo</span>
                     </label>
 
+                    <!-- Materiales del ambiente -->
+                    <div class="md:col-span-2 rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+                        <div class="flex items-center justify-between gap-4">
+                            <div>
+                                <p class="text-sm font-semibold text-white/80">Materiales disponibles</p>
+                                <p class="text-xs text-white/40 mt-0.5">
+                                    Define qué materiales podrá usar el usuario en este ambiente.
+                                </p>
+                            </div>
+                            <label class="flex items-center gap-2 shrink-0">
+                                <input v-model="form.all_materials" type="checkbox" class="h-5 w-5" />
+                                <span class="text-sm text-white/80">Todos</span>
+                            </label>
+                        </div>
+
+                        <div v-if="!form.all_materials" class="mt-4">
+                            <div class="flex items-center gap-3 mb-3">
+                                <button
+                                    type="button"
+                                    class="rounded-lg border border-white/12 px-3 py-1.5 text-xs text-white/70 hover:bg-white/10"
+                                    @click="selectAllMaterials"
+                                >
+                                    Seleccionar todos
+                                </button>
+                                <button
+                                    type="button"
+                                    class="rounded-lg border border-white/12 px-3 py-1.5 text-xs text-white/70 hover:bg-white/10"
+                                    @click="clearMaterialSelection"
+                                >
+                                    Ninguno
+                                </button>
+                                <span class="text-xs text-white/40 ml-auto">
+                                    {{ form.material_ids.length }} seleccionado(s)
+                                </span>
+                            </div>
+
+                            <div class="max-h-80 space-y-4 overflow-y-auto rounded-xl border border-white/8 p-3">
+                                <div v-if="!categories.length" class="text-sm text-white/40">
+                                    No hay categorías/materiales activos.
+                                </div>
+
+                                <div v-for="cat in categories" :key="cat.id">
+                                    <label class="flex items-center gap-2 font-semibold text-white/85">
+                                        <input
+                                            type="checkbox"
+                                            class="h-4 w-4"
+                                            :checked="isCategoryFullySelected(cat)"
+                                            @change="toggleCategory(cat, $event.target.checked)"
+                                        />
+                                        <span>{{ cat.name }}</span>
+                                        <span class="text-xs font-normal text-white/40">
+                                            {{ selectedCountInCategory(cat) }}/{{ (cat.materials || []).length }}
+                                        </span>
+                                    </label>
+
+                                    <div class="mt-2 grid grid-cols-1 gap-1.5 pl-6 sm:grid-cols-2">
+                                        <label
+                                            v-for="m in cat.materials"
+                                            :key="m.id"
+                                            class="flex items-center gap-2 text-sm text-white/70"
+                                        >
+                                            <input
+                                                type="checkbox"
+                                                class="h-4 w-4"
+                                                :checked="isMaterialSelected(m.id)"
+                                                @change="toggleMaterial(m.id, $event.target.checked)"
+                                            />
+                                            <span class="truncate">{{ m.name }}</span>
+                                        </label>
+
+                                        <p v-if="!(cat.materials || []).length" class="text-xs text-white/30">
+                                            Sin materiales activos.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="md:col-span-2 rounded-2xl border border-amber-400/20 bg-amber-500/10 p-4 text-sm text-amber-100">
                         Recomendación: usa una imagen base de alta calidad, por ejemplo 1600×1000 o 1920×1200.
                         Las máscaras PNG de las zonas deben tener exactamente el mismo tamaño.
@@ -260,9 +339,16 @@ import { router, useForm } from '@inertiajs/vue3';
 import BuilderLayout from '@/Components/AdminBuilder/BuilderLayout.vue';
 import ImageUploader from '@/Components/AdminBuilder/ImageUploader.vue';
 import TagInput from '@/Components/AdminBuilder/TagInput.vue';
+import { useToast } from '@/composables/useToast.js';
 
-defineProps({
+const toast = useToast();
+
+const props = defineProps({
     items: {
+        type: Array,
+        default: () => [],
+    },
+    categories: {
         type: Array,
         default: () => [],
     },
@@ -309,6 +395,8 @@ const form = useForm({
     sort_order: 0,
     foreground_overlay_image: null,
     remove_foreground_overlay_image: false,
+    all_materials: true,
+    material_ids: [],
 });
 
 function resetForm() {
@@ -335,6 +423,8 @@ function resetForm() {
     form.sort_order = 0;
     form.foreground_overlay_image = null;
     form.remove_foreground_overlay_image = false;
+    form.all_materials = true;
+    form.material_ids = [];
 }
 
 function openCreate() {
@@ -359,8 +449,56 @@ function openEdit(item) {
     form.is_featured = Boolean(item.is_featured);
     form.is_active = Boolean(item.is_active);
     form.sort_order = item.sort_order || 0;
+    form.all_materials = item.all_materials ?? true;
+    form.material_ids = Array.isArray(item.material_ids) ? [...item.material_ids] : [];
 
     drawerOpen.value = true;
+}
+
+// ── Selector de materiales por categoría ──────────────────────────────────────
+function isMaterialSelected(id) {
+    return form.material_ids.includes(id);
+}
+
+function toggleMaterial(id, checked) {
+    if (checked) {
+        if (!form.material_ids.includes(id)) form.material_ids = [...form.material_ids, id];
+    } else {
+        form.material_ids = form.material_ids.filter((x) => x !== id);
+    }
+}
+
+function categoryMaterialIds(category) {
+    return (category.materials || []).map((m) => m.id);
+}
+
+function selectedCountInCategory(category) {
+    return categoryMaterialIds(category).filter((id) => form.material_ids.includes(id)).length;
+}
+
+function isCategoryFullySelected(category) {
+    const ids = categoryMaterialIds(category);
+    return ids.length > 0 && ids.every((id) => form.material_ids.includes(id));
+}
+
+function toggleCategory(category, checked) {
+    const ids = categoryMaterialIds(category);
+    if (checked) {
+        const set = new Set([...form.material_ids, ...ids]);
+        form.material_ids = [...set];
+    } else {
+        form.material_ids = form.material_ids.filter((id) => !ids.includes(id));
+    }
+}
+
+function selectAllMaterials() {
+    const all = [];
+    for (const cat of props.categories) all.push(...categoryMaterialIds(cat));
+    form.material_ids = [...new Set(all)];
+}
+
+function clearMaterialSelection() {
+    form.material_ids = [];
 }
 
 function submit() {
