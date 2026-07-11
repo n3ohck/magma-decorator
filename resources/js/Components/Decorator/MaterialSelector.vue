@@ -1,35 +1,28 @@
 <template>
     <section>
-        <!-- Category tabs -->
-        <div
-            v-if="categoriesWithMaterials.length"
-            class="flex gap-1.5 overflow-x-auto pb-2 mb-3"
-        >
-            <button
-                v-for="category in categoriesWithMaterials"
-                :key="category.id"
-                type="button"
-                class="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.2em] whitespace-nowrap border transition disabled:opacity-40 disabled:cursor-not-allowed"
-                :class="activeCategory?.id === category.id
-                    ? 'bg-[#CC1A1A] text-white border-[#CC1A1A]'
-                    : 'bg-transparent text-white/50 border-white/15 hover:border-white/35 hover:text-white'"
-                :disabled="disabled"
-                @click="activeCategory = category"
-            >
-                {{ category.name }}
-                <span class="ml-1 opacity-50">{{ category.materials?.length || 0 }}</span>
-            </button>
-        </div>
-
-        <!-- Search -->
+        <!-- Category select -->
         <div v-if="categoriesWithMaterials.length" class="mb-3">
-            <input
-                v-model="search"
-                type="text"
-                class="w-full h-9 border border-white/10 bg-white/[0.04] px-4 text-xs text-white placeholder:text-white/25 outline-none focus:border-white/30 transition disabled:opacity-40"
-                placeholder="Buscar material…"
-                :disabled="disabled"
-            />
+            <label class="block text-[10px] uppercase tracking-[0.3em] text-white/35 font-semibold mb-2">
+                Categoría
+            </label>
+            <div class="relative">
+                <select
+                    :value="activeCategory?.id ?? ''"
+                    :disabled="disabled"
+                    class="w-full h-10 appearance-none border border-white/12 bg-[#0D0D0D] pl-4 pr-9 text-xs font-semibold uppercase tracking-[0.15em] text-white outline-none focus:border-white/35 transition disabled:opacity-40 cursor-pointer"
+                    @change="setCategory($event.target.value)"
+                >
+                    <option
+                        v-for="category in categoriesWithMaterials"
+                        :key="category.id"
+                        :value="category.id"
+                        class="bg-[#0D0D0D] normal-case tracking-normal"
+                    >
+                        {{ category.name }} ({{ category.materials?.length || 0 }})
+                    </option>
+                </select>
+                <span class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-white/40 text-[10px]">▾</span>
+            </div>
         </div>
 
         <!-- Material list -->
@@ -114,7 +107,7 @@
         >
             {{
                 categoriesWithMaterials.length
-                    ? 'Sin resultados para esa búsqueda.'
+                    ? 'Esta categoría no tiene materiales.'
                     : 'No hay materiales activos disponibles.'
             }}
         </div>
@@ -132,7 +125,6 @@ const props = defineProps({
 
 const emit = defineEmits(['select']);
 
-const search = ref('');
 const activeCategory = ref(null);
 
 // Tracking de imágenes cargadas para el skeleton
@@ -154,16 +146,12 @@ watch(
     { immediate: true }
 );
 
-const filteredMaterials = computed(() => {
-    const list = activeCategory.value?.materials || [];
-    if (!search.value.trim()) return list;
-    const term = search.value.toLowerCase();
-    return list.filter((m) =>
-        [m.name, m.slug, m.sku, m.finish, m.base_color, m.short_description]
-            .filter(Boolean)
-            .some((v) => String(v).toLowerCase().includes(term))
-    );
-});
+const filteredMaterials = computed(() => activeCategory.value?.materials || []);
+
+function setCategory(id) {
+    const found = categoriesWithMaterials.value.find((c) => String(c.id) === String(id));
+    if (found) activeCategory.value = found;
+}
 
 function selectMaterial(material) {
     if (props.disabled) return;
