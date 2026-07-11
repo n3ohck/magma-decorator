@@ -93,6 +93,7 @@ class EnvironmentZoneGroupBuilderController extends Controller
             'label_x'        => ['nullable', 'numeric', 'min:0', 'max:1'],
             'label_y'        => ['nullable', 'numeric', 'min:0', 'max:1'],
             'is_active'      => ['nullable', 'boolean'],
+            'default_book_match' => ['nullable', 'boolean'],
             'sort_order'     => ['nullable', 'integer', 'min:0'],
             'zone_ids'       => ['nullable', 'array'],
             'zone_ids.*'     => ['integer', 'exists:environment_zones,id'],

@@ -16,8 +16,8 @@
         </div>
 
         <div class="grid gap-5 xl:grid-cols-[1fr_420px]">
-            <div class="rounded-3xl border border-white/10 bg-white/[0.06] overflow-hidden">
-                <table class="w-full text-left">
+            <div class="rounded-3xl border border-white/10 bg-white/[0.06] overflow-x-auto">
+                <table class="w-full min-w-[820px] text-left">
                     <thead class="bg-white/[0.04] text-xs uppercase tracking-wider text-white/40">
                     <tr>
                         <th class="p-4">Máscara</th>
@@ -82,7 +82,7 @@
                                 </span>
                         </td>
 
-                        <td class="p-4 text-right">
+                        <td class="p-4 text-right whitespace-nowrap">
                             <button class="mr-4 text-violet-300 hover:text-violet-100" @click="openEdit(item)">
                                 Editar
                             </button>
@@ -94,7 +94,7 @@
                     </tr>
 
                     <tr v-if="!items.length">
-                        <td colspan="6" class="p-8 text-center text-white/50">
+                        <td colspan="7" class="p-8 text-center text-white/50">
                             No hay zonas registradas.
                         </td>
                     </tr>

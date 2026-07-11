@@ -439,6 +439,21 @@ function selectGroup(group) {
 // Toda textura recién aplicada arranca con esta escala.
 const INITIAL_TEXTURE_SCALE = 0.3;
 
+// Grupo (muro) al que pertenece una zona, si existe.
+function groupOfZone(zone) {
+    return (props.environment.active_zone_groups || []).find(
+        (g) => (g.active_zones || g.zones || []).some((z) => z.id === zone.id),
+    ) || null;
+}
+
+// Book match por defecto: si la zona pertenece a un grupo/muro, manda lo que diga el
+// grupo (default_book_match). Si es zona suelta, el default es activo.
+function defaultBookMatchFor(zone) {
+    const group = groupOfZone(zone);
+    if (group) return Boolean(group.default_book_match);
+    return true;
+}
+
 function buildZoneEntry(zone, material) {
     return {
         zone,
@@ -446,7 +461,7 @@ function buildZoneEntry(zone, material) {
         scale:     INITIAL_TEXTURE_SCALE,
         rotation:  Number(material.default_rotation || zone.default_texture_rotation || 0),
         opacity:   Number(material.default_opacity  || zone.default_opacity          || 1),
-        bookMatch: Boolean(true),
+        bookMatch: defaultBookMatchFor(zone),
         bookMatchMode: 'four',   // 'two' = spine vertical · 'four' = mariposa/diamante (default)
     };
 }

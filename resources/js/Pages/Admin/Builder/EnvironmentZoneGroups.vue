@@ -242,6 +242,11 @@
                         <span class="text-sm text-white/80">Activo</span>
                     </label>
 
+                    <label class="flex items-center gap-3">
+                        <input v-model="form.default_book_match" type="checkbox" class="h-5 w-5" />
+                        <span class="text-sm text-white/80">Book Match por defecto (muro espejado)</span>
+                    </label>
+
                     <button
                         type="submit"
                         class="md:col-span-2 rounded-2xl bg-violet-500 py-3 font-semibold text-white hover:bg-violet-600 disabled:opacity-60"
@@ -282,6 +287,7 @@ const form = useForm({
     label_x:        null,
     label_y:        null,
     is_active:      true,
+    default_book_match: true,
     sort_order:     0,
     zone_ids:       [],
 });
@@ -330,6 +336,7 @@ function resetForm() {
     form.label_x        = null;
     form.label_y        = null;
     form.is_active      = true;
+    form.default_book_match = true;
     form.sort_order     = 0;
     form.zone_ids       = [];
 }
@@ -354,6 +361,7 @@ function openEdit(item) {
     form.label_x        = item.label_x ?? null;
     form.label_y        = item.label_y ?? null;
     form.is_active      = Boolean(item.is_active);
+    form.default_book_match = item.default_book_match ?? true;
     form.sort_order     = item.sort_order || 0;
     form.zone_ids       = (item.zones || []).map((z) => z.id);
 

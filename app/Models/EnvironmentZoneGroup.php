@@ -18,12 +18,14 @@ class EnvironmentZoneGroup extends Model
         'label_x',
         'label_y',
         'is_active',
+        'default_book_match',
         'sort_order',
     ];
 
     protected $casts = [
         'environment_id' => 'integer',
         'is_active'      => 'boolean',
+        'default_book_match' => 'boolean',
         'sort_order'     => 'integer',
         'label_x'        => 'float',
         'label_y'        => 'float',
