@@ -1,9 +1,12 @@
 <template>
-    <div class="h-screen overflow-hidden bg-[#0D0D0D]">
-        <div class="grid h-full overflow-hidden lg:grid-cols-[minmax(0,1fr)_400px] xl:grid-cols-[minmax(0,1fr)_440px]">
+    <!-- Móvil: la página fluye y hace scroll (el ambiente tiene altura propia y se ve bien).
+         Escritorio (lg+): app-shell fijo de 100svh, sin scroll de página. El 100svh evita que
+         la pantalla "brinque" al ocultarse/mostrarse la barra del navegador. -->
+    <div class="app-shell bg-[#0D0D0D] lg:overflow-hidden">
+        <div class="grid lg:h-full lg:overflow-hidden lg:grid-cols-[minmax(0,1fr)_400px] xl:grid-cols-[minmax(0,1fr)_440px]">
 
             <!-- Canvas area -->
-            <main class="min-w-0 h-full overflow-hidden flex flex-col bg-[#0D0D0D]">
+            <main class="min-w-0 flex flex-col bg-[#0D0D0D] lg:h-full lg:overflow-hidden">
 
                 <!-- Top bar -->
                 <header class="shrink-0 border-b border-white/8 px-5 py-3 flex items-center justify-between gap-4">
@@ -33,11 +36,12 @@
                             ← Ambientes
                         </a>
 
-                        <div class="h-4 w-px bg-white/10 shrink-0" />
+                        <!-- Oculto en móvil: no cabe en 375px y "← Ambientes" ya cubre el regreso -->
+                        <div class="hidden sm:block h-4 w-px bg-white/10 shrink-0" />
 
                         <a
                             href="https://magmasuperficies.com"
-                            class="text-[10px] uppercase tracking-[0.25em] text-white/35 hover:text-white/70 transition shrink-0"
+                            class="hidden sm:inline text-[10px] uppercase tracking-[0.25em] text-white/35 hover:text-white/70 transition shrink-0"
                         >
                             ← Volver al sitio
                         </a>
@@ -62,7 +66,9 @@
                 </header>
 
                 <!-- Canvas -->
-                <section class="min-h-0 flex-1 overflow-hidden p-3">
+                <!-- Móvil: altura propia y DEFINIDA (no depende del contenido → sin bucle de
+                     resize) y suficiente para ver el ambiente. Escritorio: ocupa el espacio libre. -->
+                <section class="h-[55svh] min-h-[320px] overflow-hidden p-3 lg:h-auto lg:min-h-0 lg:flex-1">
                     <DecoratorCanvas
                         ref="canvasRef"
                         :environment="environment"
@@ -113,7 +119,7 @@
             </main>
 
             <!-- Sidebar -->
-            <aside class="h-full min-h-0 overflow-y-auto bg-[#111111] border-l border-white/8 flex flex-col">
+            <aside class="bg-[#111111] border-t border-white/8 flex flex-col lg:border-t-0 lg:border-l lg:h-full lg:min-h-0 lg:overflow-y-auto">
 
                 <!-- Sidebar header -->
                 <div class="sticky top-0 bg-[#111111] z-10 border-b border-white/8 px-5 py-5">
@@ -565,3 +571,16 @@ function setBookMatchMode(mode) {
     selectedMaterials.value = next;
 }
 </script>
+
+<style scoped>
+/* Sólo en escritorio fijamos la altura del shell (sin scroll de página).
+   En móvil la página fluye: el ambiente tiene su propia altura y el configurador va debajo.
+   El orden importa: 100vh es el fallback y 100svh lo pisa donde exista. 100svh usa el
+   viewport pequeño, así no cambia al ocultarse/mostrarse la barra del navegador. */
+@media (min-width: 1024px) {
+    .app-shell {
+        height: 100vh;
+        height: 100svh;
+    }
+}
+</style>
