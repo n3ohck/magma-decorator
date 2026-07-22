@@ -6,6 +6,7 @@ use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
 class WordPressAuthController extends Controller
@@ -51,24 +52,60 @@ class WordPressAuthController extends Controller
             return $this->fail('Payload malformado.');
         }
 
-        // Verificar expiración
-        if (time() - (int) $data['ts'] > self::TTL) {
+        // Verificar expiración (el ts va firmado, no se puede alterar sin el secreto)
+        $age = time() - (int) $data['ts'];
+
+        if ($age > self::TTL || $age < -self::TTL) {
             return $this->fail('Token expirado. Vuelve a hacer clic en "Decorador Virtual" desde WordPress.');
         }
 
-        // Buscar o crear el usuario admin en Laravel
-        $user = User::firstOrCreate(
-            ['email' => $data['email']],
-            [
-                'name'     => $data['name'] ?? 'Admin',
-                'password' => bcrypt(bin2hex(random_bytes(16))), // contraseña aleatoria
-            ]
-        );
+        // Anti-replay: cada token sirve UNA sola vez. Sin esto, un token capturado
+        // (logs, historial, referer) se puede reusar durante toda su ventana de validez.
+        $tokenKey = 'wp_sso_used:' . hash('sha256', $raw);
+
+        if (! Cache::add($tokenKey, true, self::TTL + 10)) {
+            Log::warning('WordPress SSO: token reutilizado', ['ip' => $request->ip()]);
+            return $this->fail('Este enlace ya fue usado. Genera uno nuevo desde WordPress.');
+        }
+
+        $email = strtolower(trim($data['email']));
+        $allowed = config('services.wordpress_sso.allowed_emails', []);
+
+        // Sólo se permiten correos de la lista blanca. Si no hay lista configurada,
+        // se admite únicamente a usuarios YA existentes: el SSO nunca crea cuentas
+        // arbitrarias. Así, aun con el secreto filtrado, no se puede fabricar un admin.
+        if (! empty($allowed)) {
+            if (! in_array($email, array_map('strtolower', $allowed), true)) {
+                Log::warning('WordPress SSO: correo no autorizado', [
+                    'email' => $email,
+                    'ip'    => $request->ip(),
+                ]);
+                return $this->fail('Esta cuenta no está autorizada para el panel.');
+            }
+
+            $user = User::firstOrCreate(
+                ['email' => $email],
+                [
+                    'name'     => $data['name'] ?? 'Admin',
+                    'password' => bcrypt(bin2hex(random_bytes(16))), // contraseña aleatoria
+                ]
+            );
+        } else {
+            $user = User::where('email', $email)->first();
+
+            if (! $user) {
+                Log::warning('WordPress SSO: usuario inexistente y sin lista blanca', [
+                    'email' => $email,
+                    'ip'    => $request->ip(),
+                ]);
+                return $this->fail('Esta cuenta no está autorizada para el panel.');
+            }
+        }
 
         // Autenticar en el guard de Backpack
         Auth::guard(backpack_guard_name())->login($user, remember: true);
 
-        Log::info('WordPress SSO: login exitoso', ['email' => $data['email'], 'ip' => $request->ip()]);
+        Log::info('WordPress SSO: login exitoso', ['email' => $email, 'ip' => $request->ip()]);
 
         return redirect('/admin/builder');
     }

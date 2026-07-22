@@ -27,7 +27,23 @@ class CheckIfAdmin
      */
     private function checkIfUserIsAdmin($user)
     {
-        // return ($user->is_admin == 1);
+        if (! $user) {
+            return false;
+        }
+
+        // Si hay lista blanca de SSO configurada, sólo esos correos son admin.
+        // Defensa en profundidad: aunque se cuele una cuenta a la tabla `users`
+        // (por SSO, registro o inyección), no obtiene acceso al panel.
+        $allowed = config('services.wordpress_sso.allowed_emails', []);
+
+        if (! empty($allowed)) {
+            return in_array(
+                strtolower($user->email),
+                array_map('strtolower', $allowed),
+                true
+            );
+        }
+
         return true;
     }
 

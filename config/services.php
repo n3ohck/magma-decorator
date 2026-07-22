@@ -38,6 +38,14 @@ return [
     'wordpress_sso' => [
         // Mismo valor que MAGMA_SSO_SECRET en el plugin de WordPress
         'secret' => env('WORDPRESS_SSO_SECRET'),
+
+        // Lista blanca de correos autorizados a entrar por SSO (separados por coma).
+        // Si está vacía, el SSO SOLO deja pasar usuarios que ya existen: nunca crea
+        // cuentas nuevas. Evita que quien tenga el secreto se fabrique un admin.
+        'allowed_emails' => array_filter(array_map(
+            'trim',
+            explode(',', (string) env('WORDPRESS_SSO_ALLOWED_EMAILS', ''))
+        )),
     ],
 
     'replicate' => [
